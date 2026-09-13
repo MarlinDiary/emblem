@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>MailPortrait</string>
+	<key>CFBundleExecutable</key>
+	<string>MailPortrait</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>org.mailportrait.app</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+	</array>
+	<key>CFBundleName</key>
+	<string>MailPortrait</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.18.0</string>
+	<key>CFBundleVersion</key>
+	<string>32</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>MailPortrait reads sender metadata from Apple Mail. It does not read subjects, message bodies or attachments, and does not mark messages as read.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>MailPortrait matches sender photos to Contacts. With automatic sync enabled, it updates photos and adds new senders. Existing personal photos are preserved unless you choose a replacement.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,21 @@
+name: Tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify toolchain
+        run: |
+          xcodebuild -version
+          test "$(xcrun --sdk macosx --show-sdk-version | cut -d. -f1)" -ge 26
+      - run: swift test
+      - run: bash Scripts/build-app.sh
+      - name: Isolated lifecycle and rollback
+        run: |
+          build/MailPortrait.app/Contents/MacOS/MailPortrait --self-test --data-dir "$RUNNER_TEMP/mailportrait-fixtures" | tee "$RUNNER_TEMP/self-test.log"
+          fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
+          MAILPORTRAIT_BINARY="$PWD/build/MailPortrait.app/Contents/MacOS/MailPortrait" bash Scripts/rollback.sh --fixture "$fixture"
