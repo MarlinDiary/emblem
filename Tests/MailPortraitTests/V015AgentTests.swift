@@ -30,11 +30,12 @@ final class V015AgentTests:XCTestCase {
         XCTAssertEqual(v["StartInterval"] as? Int,60);XCTAssertNil(v["KeepAlive"])
         XCTAssertEqual(v["ProgramArguments"] as? [String],["MailPortrait","--background-sync-agent"])
     }
-    @MainActor func testBackgroundRegistrationRefreshesOnlyWhenAnEnabledBuildChanges() {
-        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:nil,currentBuild:"29"))
-        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"27",currentBuild:"29"))
-        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29"))
-        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:false,registeredBuild:"27",currentBuild:"29"))
+    @MainActor func testBackgroundRegistrationRefreshesWhenBuildOrBundlePathChanges() {
+        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:nil,currentBuild:"29",registeredBundlePath:nil,currentBundlePath:"/Applications/MailPortrait.app"))
+        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"27",currentBuild:"29",registeredBundlePath:"/Applications/MailPortrait.app",currentBundlePath:"/Applications/MailPortrait.app"))
+        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/tmp/MailPortrait.app",currentBundlePath:"/Applications/MailPortrait.app"))
+        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/Applications/MailPortrait.app",currentBundlePath:"/Applications/MailPortrait.app"))
+        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:false,registeredBuild:"27",currentBuild:"29",registeredBundlePath:"/tmp/MailPortrait.app",currentBundlePath:"/Applications/MailPortrait.app"))
     }
     @MainActor func testShutdownDoesNotStartFollowupContactWrites()throws {
         let m=AppModel(demo:false,rootOverride:try root(),backgroundWorkAllowed:true)

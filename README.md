@@ -5,9 +5,9 @@ MailPortrait is a local-first macOS companion for sender avatars in Apple Mail. 
 - Native SwiftUI and AppKit interface with macOS materials and controls
 - No Mail plug-in, browser extension, hosted account, analytics, or menu-bar item
 - Open source under the MIT License
-- Current version: **0.18.1**
+- Current version: **0.18.2**
 
-Download: [MailPortrait 0.18.1 for macOS](https://github.com/MarlinDiary/mail-portrait/releases/download/v0.18.1/MailPortrait-0.18.1-macOS.zip) · Website: [mailportrait.protoyard.com](https://mailportrait.protoyard.com/) · Privacy: [mailportrait.protoyard.com/privacy](https://mailportrait.protoyard.com/privacy/)
+Download: [MailPortrait 0.18.2 for macOS](https://github.com/MarlinDiary/mail-portrait/releases/download/v0.18.2/MailPortrait-0.18.2-macOS.zip) · Website: [mailportrait.protoyard.com](https://mailportrait.protoyard.com/) · Privacy: [mailportrait.protoyard.com/privacy](https://mailportrait.protoyard.com/privacy/)
 
 ## What it does
 
