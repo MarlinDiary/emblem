@@ -5,9 +5,9 @@ MailPortrait is a local-first macOS companion for sender avatars in Apple Mail. 
 - Native SwiftUI and AppKit interface with macOS materials and controls
 - No Mail plug-in, browser extension, hosted account, analytics, or menu-bar item
 - Open source under the MIT License
-- Current version: **0.18.0**
+- Current version: **0.18.1**
 
-Website: [mailportrait.protoyard.com](https://mailportrait.protoyard.com/) · Privacy: [mailportrait.protoyard.com/privacy](https://mailportrait.protoyard.com/privacy/)
+Download: [MailPortrait 0.18.1 for macOS](https://github.com/MarlinDiary/mail-portrait/releases/download/v0.18.1/MailPortrait-0.18.1-macOS.zip) · Website: [mailportrait.protoyard.com](https://mailportrait.protoyard.com/) · Privacy: [mailportrait.protoyard.com/privacy](https://mailportrait.protoyard.com/privacy/)
 
 ## What it does
 
@@ -68,14 +68,14 @@ Liquid Glass controls are used on macOS 26 or later; older supported systems rec
 ## Build
 
 ```sh
-git clone https://github.com/MarlinDiary/mailportrait.git
-cd mailportrait
+git clone https://github.com/MarlinDiary/mail-portrait.git
+cd mail-portrait
 swift test
 bash Scripts/build-app.sh
 open build/MailPortrait.app
 ```
 
-`build-app.sh` never overwrites an existing output. It uses an unambiguous Developer ID Application identity when one is available and otherwise performs an ad-hoc local signature. Public binary distribution additionally requires notarization.
+`build-app.sh` never overwrites an existing output. It uses an unambiguous Developer ID Application identity when one is available and otherwise performs an ad-hoc local signature. The downloadable release is Developer ID signed, notarized by Apple, and has its notarization ticket stapled to the app bundle.
 
 Dependencies are resolved by Swift Package Manager. AppAuth 3.0.0 is used for OAuth; third-party notices are included in the app bundle and repository.
 
