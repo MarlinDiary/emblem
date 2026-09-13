@@ -12,6 +12,7 @@ final class DeadlineGate<Value: Sendable>: @unchecked Sendable {
     private var result: Result<Value,Error>?
     private var continuation: CheckedContinuation<Value,Error>?
     private var tasks: [Task<Void,Never>] = []
+    private var timers: [DispatchWorkItem] = []
     func install(_ continuation: CheckedContinuation<Value,Error>) {
         lock.lock()
         let result = self.result
@@ -25,14 +26,21 @@ final class DeadlineGate<Value: Sendable>: @unchecked Sendable {
         lock.unlock()
         if finished { task.cancel() }
     }
+    func track(_ timer: DispatchWorkItem) {
+        lock.lock(); let finished = result != nil
+        if !finished { timers.append(timer) }
+        lock.unlock()
+        if finished { timer.cancel() }
+    }
     func finish(_ value: Result<Value,Error>) {
         lock.lock()
         guard result == nil else { lock.unlock(); return }
         result = value
-        let continuation = self.continuation, tasks = self.tasks
-        self.continuation = nil; self.tasks = []
+        let continuation = self.continuation, tasks = self.tasks, timers = self.timers
+        self.continuation = nil; self.tasks = []; self.timers = []
         lock.unlock()
         tasks.forEach { $0.cancel() }
+        timers.forEach { $0.cancel() }
         continuation?.resume(with:value)
     }
 }
@@ -46,10 +54,12 @@ public func withDeadline<Value: Sendable>(seconds: TimeInterval, operation: @esc
                 do { try Task.checkCancellation(); gate.finish(.success(try await operation())) }
                 catch { gate.finish(.failure(error)) }
             })
-            gate.track(Task {
-                do { try await Task.sleep(for:.seconds(max(0,seconds))); gate.finish(.failure(DeadlineExceeded(seconds:seconds))) }
-                catch { }
-            })
+            // A non-cooperative OS call may occupy Swift's cooperative pool.
+            // Use a GCD timer so the deadline itself cannot be starved behind
+            // the work it exists to bound.
+            let timer=DispatchWorkItem {gate.finish(.failure(DeadlineExceeded(seconds:seconds)))}
+            gate.track(timer)
+            DispatchQueue.global(qos:.userInitiated).asyncAfter(deadline:.now()+max(0,seconds),execute:timer)
         }
     } onCancel: { gate.finish(.failure(CancellationError())) }
 }
