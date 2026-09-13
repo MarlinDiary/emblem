@@ -2,7 +2,7 @@ import XCTest
 import AppKit
 @testable import PortraitCore
 final class V013CoreRegressionTests: XCTestCase {
-    private func assets() throws -> URL { guard let root=ProcessInfo.processInfo.environment["MAILPORTRAIT_V013_ASSETS"] else { throw XCTSkip("real asset corpus opt-in") };return URL(fileURLWithPath:root) }
+    private func assets() throws -> URL { guard let root=ProcessInfo.processInfo.environment["EMBLEM_V013_ASSETS"] else { throw XCTSkip("real asset corpus opt-in") };return URL(fileURLWithPath:root) }
     func testCurrentlyDeclaredFaviconBeatsConventionalTouchInPersistedCandidates() throws {
         let root=try assets()
         let rows=try JSONSerialization.jsonObject(with:Data(contentsOf:root.appendingPathComponent("corpus.json"))) as! [[String:Any]]

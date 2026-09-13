@@ -68,7 +68,7 @@ public func withDeadline<Value: Sendable>(seconds: TimeInterval, operation: @esc
 // queued work so a long outage cannot accumulate blocking DNS threads.
 enum DNSPreflight {
     private static let queue: OperationQueue = {
-        let queue = OperationQueue(); queue.name = "MailPortrait.DNS"; queue.maxConcurrentOperationCount = 4
+        let queue = OperationQueue(); queue.name = "Emblem.DNS"; queue.maxConcurrentOperationCount = 4
         queue.qualityOfService = .utility; return queue
     }()
     static func validate(_ url: URL, pinned: Bool) async throws {

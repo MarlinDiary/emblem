@@ -28,13 +28,13 @@ public enum ImagePipeline {
         let backdrop: CGColor?
     }
     public static func reframeStoredBrand(_ data:Data,maskable:Bool) throws -> Data {
-        try decode(.init(data:data,url:URL(string:"https://migration.mailportrait.invalid/icon.png")!),source:.favicon,maskable:maskable).png
+        try decode(.init(data:data,url:URL(string:"https://migration.emblem.invalid/icon.png")!),source:.favicon,maskable:maskable).png
     }
     public static func reframeStoredBrand(_ candidate: AvatarCandidate) throws -> AvatarCandidate {
         // Already framed artwork is a payload, not an original image. Reapplying
         // a safe inset repeatedly would shrink the logo on every migration.
         if candidate.artwork != nil && (candidate.layoutRevision ?? 0) >= 5 { return candidate }
-        let url = URL(string: candidate.origin) ?? URL(string:"https://migration.mailportrait.invalid/icon.png")!
+        let url = URL(string: candidate.origin) ?? URL(string:"https://migration.emblem.invalid/icon.png")!
         var sourceData = candidate.png
         // Layout revision 1 rasterized every SVG into a square before analysis.
         // Reconstruct the declared intrinsic ratio from the saved metadata so an

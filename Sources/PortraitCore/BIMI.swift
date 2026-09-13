@@ -39,7 +39,7 @@ private let mailPortraitTXTCallback: DNSServiceQueryRecordReply = {
 public struct SystemTXTRecordFetcher: TXTRecordFetching, Sendable {
     private static let queue: OperationQueue = {
         let queue = OperationQueue()
-        queue.name = "MailPortrait.BIMI.DNS"
+        queue.name = "Emblem.BIMI.DNS"
         queue.maxConcurrentOperationCount = 4
         queue.qualityOfService = .utility
         return queue

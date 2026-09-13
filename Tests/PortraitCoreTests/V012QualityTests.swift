@@ -30,7 +30,7 @@ final class V012QualityTests: XCTestCase {
         XCTAssertEqual(CandidateSelection.recommended([blank,logo]).first?.id,logo.id)
     }
     func testRealCorpusQuality() throws {
-        guard let folder=ProcessInfo.processInfo.environment["MAILPORTRAIT_V012_ASSETS"] else { throw XCTSkip("real asset fixture opt-in") }
+        guard let folder=ProcessInfo.processInfo.environment["EMBLEM_V012_ASSETS"] else { throw XCTSkip("real asset fixture opt-in") }
         let root=URL(fileURLWithPath:folder)
         let rows=try JSONSerialization.jsonObject(with:Data(contentsOf:root.appendingPathComponent("corpus.json"))) as! [[String:Any]]
         for row in rows {

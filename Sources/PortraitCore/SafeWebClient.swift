@@ -108,7 +108,7 @@ public final class SafeWebClient: ResourceFetching, @unchecked Sendable {
         try Task.checkCancellation()
         var request = input
         if request.value(forHTTPHeaderField: "User-Agent") == nil {
-            request.setValue("MailPortrait/0.18 (+local-avatar-helper)", forHTTPHeaderField: "User-Agent")
+            request.setValue("Emblem/0.18 (+local-avatar-helper)", forHTTPHeaderField: "User-Agent")
         }
         let (stream, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse, let finalURL = response.url, NetworkPolicy.isAllowedURL(finalURL) else { throw PortraitError.message("The website did not return a valid response.") }

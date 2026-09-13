@@ -5,7 +5,7 @@ BOOL MPHistoryUnchanged(CNContactStore *store, NSData *token, NSError **error) {
     request.startingToken = token;
     request.shouldUnifyResults = NO;
     request.includeGroupChanges = YES;
-    request.excludedTransactionAuthors = @[@"org.mailportrait.app"];
+    request.excludedTransactionAuthors = @[@"com.protoyard.emblem", @"org.mailportrait.app"];
     CNFetchResult<NSEnumerator<CNChangeHistoryEvent *> *> *result = [store enumeratorForChangeHistoryFetchRequest:request error:error];
     if (!result) return NO;
     return result.value.nextObject == nil;
@@ -40,7 +40,7 @@ NSDictionary<NSString *, NSNumber *> *MPContactHistoryInspection(CNContactStore 
     request.shouldUnifyResults = NO;
     request.includeGroupChanges = YES;
     request.additionalContactKeyDescriptors = @[CNContactIdentifierKey];
-    request.excludedTransactionAuthors = @[@"org.mailportrait.app"];
+    request.excludedTransactionAuthors = @[@"com.protoyard.emblem", @"org.mailportrait.app"];
     CNFetchResult<NSEnumerator<CNChangeHistoryEvent *> *> *result = [store enumeratorForChangeHistoryFetchRequest:request error:error];
     if (!result) return nil;
     NSUInteger total = 0, affected = 0, unknownCount = 0, reset = 0, additions = 0, updates = 0, deletions = 0;

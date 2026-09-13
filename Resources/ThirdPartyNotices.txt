@@ -1,4 +1,4 @@
-MailPortrait includes AppAuth for iOS and macOS 3.0.0.
+Emblem includes AppAuth for iOS and macOS 3.0.0.
 Copyright The AppAuth Authors. Licensed under Apache License 2.0.
 https://github.com/openid/AppAuth-iOS
 

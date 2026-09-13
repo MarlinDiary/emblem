@@ -16,6 +16,6 @@ jobs:
       - run: bash Scripts/build-app.sh
       - name: Isolated lifecycle and rollback
         run: |
-          build/MailPortrait.app/Contents/MacOS/MailPortrait --self-test --data-dir "$RUNNER_TEMP/mailportrait-fixtures" | tee "$RUNNER_TEMP/self-test.log"
+          build/Emblem.app/Contents/MacOS/Emblem --self-test --data-dir "$RUNNER_TEMP/emblem-fixtures" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
-          MAILPORTRAIT_BINARY="$PWD/build/MailPortrait.app/Contents/MacOS/MailPortrait" bash Scripts/rollback.sh --fixture "$fixture"
+          EMBLEM_BINARY="$PWD/build/Emblem.app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"

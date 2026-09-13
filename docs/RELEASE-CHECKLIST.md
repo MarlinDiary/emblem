@@ -4,7 +4,7 @@
 
 - [ ] `git diff --check` passes.
 - [ ] `swift test` passes with no unexpected skip or network dependency.
-- [ ] Source/archive scan finds no OAuth JSON, secrets, tokens, real MailPortrait library, personal diagnostics, contact images, or signing material.
+- [ ] Source/archive scan finds no OAuth JSON, secrets, tokens, real Emblem library, personal diagnostics, contact images, or signing material.
 - [ ] Dependency licenses and privacy descriptions are present.
 
 ## Isolated behavior

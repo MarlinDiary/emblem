@@ -1,6 +1,6 @@
 # Architecture
 
-MailPortrait is a sandboxed-style local companion rather than a Mail plug-in. Three modules enforce the primary boundaries.
+Emblem is a sandboxed-style local companion rather than a Mail plug-in. Three modules enforce the primary boundaries.
 
 ## Modules
 
@@ -8,7 +8,7 @@ MailPortrait is a sandboxed-style local companion rather than a Mail plug-in. Th
 
 `PortraitCore` owns email/domain parsing, Public Suffix List routing, BIMI and website discovery policy, image validation, circular composition, candidate ranking, and journaled contact changes. It has no Gmail token storage or application UI.
 
-### MailPortrait
+### Emblem
 
 The executable owns SwiftUI/AppKit views, Gmail metadata ingestion, bounded Apple Mail scanning, automatic orchestration, the Keychain adapter, the foreground/background library lease, and Contacts synchronization.
 
@@ -16,7 +16,7 @@ The sender column is an `NSTableView` source list wrapped in `NSViewRepresentabl
 
 ### PortraitContactsBridge
 
-The Objective-C bridge exposes only Contacts change-history operations unavailable through the required Swift surface. App-authored transactions use `org.mailportrait.app` as their author so a stable no-external-change pass can skip reading every linked card.
+The Objective-C bridge exposes only Contacts change-history operations unavailable through the required Swift surface. App-authored transactions use `com.protoyard.emblem` as their author so a stable no-external-change pass can skip reading every linked card.
 
 ## Data flow
 
@@ -53,7 +53,7 @@ All discovery fetches use public HTTPS on port 443. Credential-bearing URLs, loo
 
 ## Storage and concurrency
 
-Application data lives in `~/Library/Application Support/MailPortrait/`; Gmail credentials and OAuth client configuration live in Keychain. The foreground app and the `SMAppService` background job acquire the same non-blocking `flock` lease. A foreground request asks a running bounded job to cancel, await its tasks, checkpoint, and release the lease before the GUI opens the live library.
+Application data lives in `~/Library/Application Support/Emblem/`; Gmail credentials and OAuth client configuration live in Keychain. The foreground app and the `SMAppService` background job acquire the same non-blocking `flock` lease. A foreground request asks a running bounded job to cancel, await its tasks, checkpoint, and release the lease before the GUI opens the live library.
 
 ## Recovery boundary
 

@@ -1,11 +1,11 @@
-# Contributing to MailPortrait
+# Contributing to Emblem
 
-Thank you for helping improve MailPortrait.
+Thank you for helping improve Emblem.
 
 ## Before opening a change
 
 1. Search existing issues and keep each pull request focused.
-2. Use synthetic sender addresses, fixture Contacts, and captured public test assets. Never commit a real MailPortrait library, mailbox diagnostics, OAuth JSON, token, contact photo, or signing credential.
+2. Use synthetic sender addresses, fixture Contacts, and captured public test assets. Never commit a real Emblem library, mailbox diagnostics, OAuth JSON, token, contact photo, or signing credential.
 3. For a bug fix, add a failing regression first, make the smallest implementation change, then run the same test and the complete suite.
 
 ## Local checks
@@ -13,7 +13,7 @@ Thank you for helping improve MailPortrait.
 ```sh
 swift test
 bash Scripts/build-app.sh
-build/MailPortrait.app/Contents/MacOS/MailPortrait --self-test --data-dir /tmp/mailportrait-self-test
+build/Emblem.app/Contents/MacOS/Emblem --self-test --data-dir /tmp/emblem-self-test
 ```
 
 Also run `git diff --check` and inspect every new network endpoint and user-facing string.

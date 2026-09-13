@@ -7,7 +7,7 @@ private struct PublishedAmazonBIMI: BIMILogoResolving {
 }
 final class V0121LookupContinuationTests: XCTestCase {
     func testWideBIMIDoesNotStopLookingForACompactOfficialIcon() async throws {
-        guard let state=ProcessInfo.processInfo.environment["MAILPORTRAIT_AMAZON_STATE"] else { throw XCTSkip("captured Amazon artwork opt-in") }
+        guard let state=ProcessInfo.processInfo.environment["EMBLEM_AMAZON_STATE"] else { throw XCTSkip("captured Amazon artwork opt-in") }
         struct Row:Decodable { var candidates:[AvatarCandidate] }
         let captured=try JSONDecoder().decode([Row].self,from:Data(contentsOf:URL(fileURLWithPath:state)))
         let original=try XCTUnwrap(captured.first?.candidates.first { $0.source == .bimi })

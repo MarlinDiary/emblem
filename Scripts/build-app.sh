@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRATCH="${MAILPORTRAIT_BUILD_DIR:-$ROOT/.build}"
+SCRATCH="${EMBLEM_BUILD_DIR:-$ROOT/.build}"
 DEST="${1:-$ROOT/build}"
 mkdir -p "$DEST"
 DEST="$(cd "$DEST" && pwd)"
 cd "$ROOT"
 for key in com.apple.security.personal-information.addressbook com.apple.security.automation.apple-events; do
-  [[ "$(/usr/libexec/PlistBuddy -c "Print :$key" "$ROOT/Resources/MailPortrait.entitlements")" == "true" ]] || { echo "Missing required entitlement: $key" >&2; exit 4; }
+  [[ "$(/usr/libexec/PlistBuddy -c "Print :$key" "$ROOT/Resources/Emblem.entitlements")" == "true" ]] || { echo "Missing required entitlement: $key" >&2; exit 4; }
 done
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
@@ -16,17 +16,17 @@ SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
 # Pass the actual SDK explicitly; otherwise AppKit may render compatibility UI.
 BUILD_ARGS=(-c release --scratch-path "$SCRATCH" --sdk "$SDK"
   -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$SDK_VERSION")
-swift build "${BUILD_ARGS[@]}" --product MailPortrait
+swift build "${BUILD_ARGS[@]}" --product Emblem
 BIN="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
-LINKED_SDK="$(xcrun vtool -show-build "$BIN/MailPortrait" | awk '$1 == "sdk" { print $2; exit }')"
+LINKED_SDK="$(xcrun vtool -show-build "$BIN/Emblem" | awk '$1 == "sdk" { print $2; exit }')"
 [[ "$LINKED_SDK" == "$SDK_VERSION" ]] || { echo "Linked SDK mismatch: $LINKED_SDK (expected $SDK_VERSION)" >&2; exit 3; }
-APP="$DEST/MailPortrait.app"
+APP="$DEST/Emblem.app"
 if [[ -e "$APP" ]]; then
   echo "Output already exists: $APP. Move it aside before rebuilding." >&2
   exit 2
 fi
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/MailPortrait" "$APP/Contents/MacOS/MailPortrait"
+cp "$BIN/Emblem" "$APP/Contents/MacOS/Emblem"
 cp "$ROOT/Sources/PortraitCore/Resources/public_suffix_list.dat" "$APP/Contents/Resources/"
 cp "$ROOT/Sources/PortraitCore/Resources/claude-icon.svg" "$APP/Contents/Resources/"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
@@ -35,11 +35,13 @@ cp "$ROOT/Resources/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 for RESOURCE in "$BIN"/*.bundle; do
   [[ -d "$RESOURCE" ]] && cp -R "$RESOURCE" "$APP/Contents/Resources/"
 done
-if [[ -n "${MAILPORTRAIT_GOOGLE_CLIENT_ID:-}" ]]; then
-  [[ "$MAILPORTRAIT_GOOGLE_CLIENT_ID" == *.apps.googleusercontent.com ]] || exit 4
-  plutil -insert MailPortraitGoogleClientID -string "$MAILPORTRAIT_GOOGLE_CLIENT_ID" "$APP/Contents/Info.plist"
+if [[ -n "${EMBLEM_GOOGLE_CLIENT_ID:-}" ]]; then
+  [[ "$EMBLEM_GOOGLE_CLIENT_ID" == *.apps.googleusercontent.com ]] || exit 4
+  plutil -insert EmblemGoogleClientID -string "$EMBLEM_GOOGLE_CLIENT_ID" "$APP/Contents/Info.plist"
 fi
 mkdir -p "$APP/Contents/Library/LaunchAgents"
+cp "$ROOT/Resources/LaunchAgents/com.protoyard.emblem.sync.plist" "$APP/Contents/Library/LaunchAgents/"
+# Kept for one release so Emblem can unregister the previous login item during upgrade.
 cp "$ROOT/Resources/LaunchAgents/org.mailportrait.sync.plist" "$APP/Contents/Library/LaunchAgents/"
 plutil -insert DTSDKName -string "macosx$SDK_VERSION" "$APP/Contents/Info.plist"
 plutil -insert DTPlatformVersion -string "$SDK_VERSION" "$APP/Contents/Info.plist"
@@ -55,7 +57,7 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
   COUNT="$(printf '%s\n' "$IDENTITIES" | grep -c '^[A-F0-9]' || true)"
   if [[ "$COUNT" == "1" ]]; then SIGN_IDENTITY="$IDENTITIES"; else SIGN_IDENTITY="-"; fi
 fi
-codesign --force --options runtime --entitlements "$ROOT/Resources/MailPortrait.entitlements" --sign "$SIGN_IDENTITY" "$APP"
+codesign --force --options runtime --entitlements "$ROOT/Resources/Emblem.entitlements" --sign "$SIGN_IDENTITY" "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 echo "APP=$APP"

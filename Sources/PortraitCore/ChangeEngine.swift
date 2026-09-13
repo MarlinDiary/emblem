@@ -48,7 +48,7 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let fd = open(url.appendingPathExtension("lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
         guard fd >= 0 else { throw PortraitError.message("The operation lock could not be created. Contacts were not changed.") }
-        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { close(fd); throw PortraitError.message("Another MailPortrait operation is running. Try again shortly.") }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { close(fd); throw PortraitError.message("Another Emblem operation is running. Try again shortly.") }
         lockFD = fd
     }
     public func unlock() { if lockFD >= 0 { flock(lockFD, LOCK_UN); close(lockFD); lockFD = -1 } }
@@ -169,9 +169,9 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
         guard let index = records.firstIndex(where: { $0.id == id }), records[index].state == .applied, let contactID = records[index].contactID else { throw PortraitError.message("This record is unfinished or already undone.") }
         let record = records[index]
         if let current = try store.get(id: contactID) {
-            guard photoMatches(current.image,encodedHash:record.afterHash,pixelHash:record.afterPixelHash) else { throw PortraitError.message("This contact’s photo changed after MailPortrait applied it. Your newer photo is preserved.") }
+            guard photoMatches(current.image,encodedHash:record.afterHash,pixelHash:record.afterPixelHash) else { throw PortraitError.message("This contact’s photo changed after Emblem applied it. Your newer photo is preserved.") }
             if let expected=record.afterEmailsHash {
-                guard digestEmails(current.emails) == expected else { throw PortraitError.message("This contact’s email addresses changed after MailPortrait applied them. The current contact is preserved.") }
+                guard digestEmails(current.emails) == expected else { throw PortraitError.message("This contact’s email addresses changed after Emblem applied them. The current contact is preserved.") }
             }
             if let beforeName=record.beforeName,let afterName=record.afterName {
                 let restored=try store.rename(id:contactID,expectedName:afterName,name:beforeName)

@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <Contacts/Contacts.h>
 NS_ASSUME_NONNULL_BEGIN
-/// Conservative deletion guard: ANY non-MailPortrait contact/group event invalidates deletion.
+/// Conservative deletion guard: ANY non-Emblem contact/group event invalidates deletion.
 BOOL MPHistoryUnchanged(CNContactStore *store, NSData * _Nullable token, NSError **error);
 NS_ASSUME_NONNULL_END
 NS_ASSUME_NONNULL_BEGIN
