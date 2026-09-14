@@ -10,6 +10,11 @@ import PortraitCore
         EmblemMigration.migratePreferences()
         if args.contains("--gmail-status") {exit(GmailStatus.run(arguments:args))}
         if args.contains("--lease-fixture") {exit(LibraryLease.fixture(arguments:args))}
+        if args.contains("--rows-encoding-fixture") {
+            guard NSApp == nil else {exit(1)}
+            Task {exit(await RowsPersistence.fixture())}
+            RunLoop.main.run();exit(1)
+        }
         if args.contains("--headless-fixture") {
             do {
                 guard NSApp == nil else {exit(1)}

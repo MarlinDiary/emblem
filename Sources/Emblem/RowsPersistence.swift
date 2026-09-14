@@ -6,6 +6,19 @@ enum RowsPersistence {
         let encoder=JSONEncoder();encoder.outputFormatting=[.withoutEscapingSlashes]
         return try encoder.encode(rows)
     }
+    /// Exact synthetic workload for launchd resource-class acceptance. Never
+    /// opens the real library, Contacts, Gmail or Keychain.
+    static func fixture()async->Int32 {
+        do {
+            var row=SenderRow(email:EmailAddress("image@fixture.test")!,name:"Encoding Fixture")
+            let candidate=AvatarCandidate(source:.touchIcon,origin:"https://fixture.test/icon.png",width:256,height:256,png:Data(repeating:255,count:64_000))
+            row.candidates=[candidate];row.selectedCandidate=candidate.id
+            let rows=Array(repeating:row,count:1000),start=Date()
+            let data=try await Task.detached(priority:.utility) {try encode(rows)}.value
+            print("ROW_ENCODING_FIXTURE_BYTES=\(data.count) SECONDS=\(Date().timeIntervalSince(start)) APPKIT_APPLICATION=ABSENT CONTACT_WRITES=0 KEYCHAIN_READS=0")
+            return 0
+        } catch {return 1}
+    }
 }
 
 extension AppModel {

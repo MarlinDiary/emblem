@@ -252,7 +252,7 @@ extension AppModel {
         for i in rows.indices where keys.contains(MailSyncIdentity.key(rows[i])) {rows[i].ignored=true}
         try saveMailSync();save()
         lastIgnoredIDs=Set(rows.filter{keys.contains(MailSyncIdentity.key($0))}.map(\.id))
-        ignoreSummary="Sync stopped"
+        ignoreSummary="Ignored"
         var removed=0,kept=0,protected=0,visited=Set<String>()
         if mailSync.enabled {
             if let live=port as? AppleContacts {try live.requireFullAccess()}
