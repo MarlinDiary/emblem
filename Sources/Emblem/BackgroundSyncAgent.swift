@@ -23,7 +23,12 @@ import PortraitCore
     }
     private static func fallbackInterval(root:URL)->TimeInterval {
         let automation=(try? Data(contentsOf:root.appendingPathComponent("automation.json"))).flatMap{try? JSONDecoder().decode(AutomationPreferences.self,from:$0)}
-        let accounts=(try? Data(contentsOf:root.appendingPathComponent("gmail.json"))).flatMap{try? JSONDecoder().decode(GmailConnections.self,from:$0)}?.accounts ?? []
+        var accounts=(try? Data(contentsOf:root.appendingPathComponent("gmail.json"))).flatMap{try? JSONDecoder().decode(GmailConnections.self,from:$0)}?.accounts ?? []
+        let presence=GmailPushPresence(root:root)
+        for index in accounts.indices {
+            let heartbeat=try? presence.lastAlive(accountID:accounts[index].id)
+            accounts[index].push?.deliveryHeartbeat=heartbeat
+        }
         return fallbackInterval(mailEnabled:automation?.mail != false,accounts:accounts,now:Date())
     }
 
@@ -50,7 +55,7 @@ import PortraitCore
         guard let data=try? Data(contentsOf:root.appendingPathComponent("gmail.json")),
               let connections=try? JSONDecoder().decode(GmailConnections.self,from:data) else{return []}
         return connections.accounts.compactMap {account in
-            guard account.pushIsHealthy(at:Date()),let state=account.push,
+            guard account.pushRegistrationIsValid(at:Date()),let state=account.push,
                   let channel=try? GmailPushCredentials.channelToken(accountID:account.id) else{return nil}
             return ListenerDescriptor(accountID:account.id,state:state,channelToken:channel)
         }
@@ -69,7 +74,7 @@ import PortraitCore
                 running[descriptor.accountID]?.task.cancel()
                 let rootCopy=root,id=descriptor.accountID,state=descriptor.state,channel=descriptor.channelToken
                 let task=Task {
-                    await GmailPushListener.run(configuration:configuration,state:state,channelToken:channel) {history in
+                    await GmailPushListener.run(configuration:configuration,state:state,channelToken:channel,accountID:id,root:rootCopy) {history in
                         do {
                             try GmailPushInbox(root:rootCopy).append(.init(accountID:id,historyID:history,receivedAt:Date()))
                             GmailPushSignal.post()
@@ -81,7 +86,9 @@ import PortraitCore
             }
             guard !running.isEmpty else {writeStatus("polling-fallback",root:root);return 0}
             let foregroundBusy=processingWake ? foregroundWasBusy : (try? LibraryLease.writerIsBusy(root:root)) ?? true
-            writeStatus(foregroundBusy ? "push-listening-foreground":"push-listening",root:root,pushListeners:running.count)
+            let presence=GmailPushPresence(root:root)
+            let connected=descriptors.filter{(try? presence.lastAlive(accountID:$0.accountID)) != nil}.count
+            writeStatus(connected == 0 ? "push-reconnecting":foregroundBusy ? "push-listening-foreground":"push-listening",root:root,pushListeners:connected)
             if (foregroundWasBusy && !foregroundBusy) || Date().timeIntervalSince(lastFallback)>=fallbackInterval(root:root) {
                 _=await processOnce(root:root)
                 lastFallback=Date()

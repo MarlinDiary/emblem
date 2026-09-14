@@ -13,6 +13,7 @@ __pycache__/
 *.pyc
 gmail-push-inbox.json
 gmail-push-inbox.lock
+gmail-push-presence/
 *.app
 *.dmg
 *.pkg

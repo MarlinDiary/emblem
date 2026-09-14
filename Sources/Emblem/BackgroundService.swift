@@ -13,7 +13,7 @@ import ServiceManagement
     static func shouldRefreshRegistration(isEnabled:Bool,registeredBuild:String?,currentBuild:String,registeredBundlePath:String?,currentBundlePath:String,registeredPushSignature:String?=nil,currentPushSignature:String="")->Bool {
         isEnabled && (registeredBuild != currentBuild || registeredBundlePath != currentBundlePath || registeredPushSignature != currentPushSignature)
     }
-    static func pushSignature(_ model:AppModel)->String {model.gmail.accounts.filter{$0.pushIsHealthy(at:Date())}.map(\.id).sorted().joined(separator:"|")}
+    static func pushSignature(_ model:AppModel)->String {model.gmail.accounts.filter{$0.pushRegistrationIsValid(at:Date())}.map(\.id).sorted().joined(separator:"|")}
     static func update(for model:AppModel)async {
         do {
             if model.mailSync.background && model.mailSync.enabled {

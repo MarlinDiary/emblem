@@ -16,6 +16,7 @@ Notifications are **hints**, not authoritative cursors. Emblem replays its persi
 
 - Gmail notification starts an incremental check immediately (background bursts are coalesced for 200 ms), not after the next polling timer.
 - The WebSocket uses 45-second protocol pings, a 15-second ping deadline, and reconnect backoff from 1 to 60 seconds.
+- Socket liveness is recorded separately from the library lease on every valid frame and successful protocol ping. A known disconnect clears only its own connection record; a replaced connection cannot erase a newer heartbeat. Silent/stale heartbeats expire after 120 seconds. A registered watch without a live socket immediately uses the regular check policy, while its listener continues reconnecting.
 - A healthy Push account gets a 15-minute safety check for delayed/dropped Gmail notifications. A failed or non-Push account retains regular checks, with 5-minute API error backoff.
 - Apple Mail fallback retains approximately one-minute checks when enabled; it covers other accounts and unhealthy Gmail connections, not another address merely sharing `gmail.com`.
 - Gmail watch renews **automatically daily**, and also when less than 48 hours remain. No weekly manual action is required. Failed renewals retry after 5 minutes and leave regular checks available.
@@ -29,7 +30,7 @@ Registration sends a Google ID token plus the account email to prove the mailbox
 
 Google's notification envelope contains the account email and a history ID. The Worker receives it, HMACs the normalized email, and immediately forwards only the history hint. Durable storage contains the keyed account identifier (object name), device UUID, SHA-256 channel-token hash, registration/expiration timestamps. It stores no plaintext email, history, subject, body, address book or images. Expiry alarms remove stale device rows. There are at most ten devices per account and two handoff sockets per device. Observability/logging is disabled; deployment operators must not add request-payload logging. Cloudflare/Google still process network traffic and infrastructure metadata under their own policies. Pub/Sub may retain undelivered notification envelopes for up to the configured one hour.
 
-The Mac keeps its opaque channel token in Keychain, the account registration and pending hints in its restricted local data directory. Disconnect revokes this device when the relay is reachable; offline revocation falls back to registration expiry. Google account revocation is also available from the Google Account connected-app settings.
+The Mac keeps its opaque channel token in Keychain, the account registration, short-lived socket-presence timestamps and pending hints in its restricted local data directory. Disconnect revokes this device when the relay is reachable; offline revocation falls back to registration expiry. Google account revocation is also available from the Google Account connected-app settings.
 
 ## Deploy
 

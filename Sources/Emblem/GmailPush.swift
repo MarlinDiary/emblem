@@ -43,6 +43,7 @@ struct GmailPushState: Codable, Equatable, Sendable {
     var watchExpiration: Date?
     var lastWatchRenewal: Date?
     var lastPush: Date?
+    var deliveryHeartbeat: Date? = nil
 
     func registrationNeedsRenewal(now: Date) -> Bool { registrationExpiration.timeIntervalSince(now) < 7 * 86_400 }
     func watchNeedsRenewal(now: Date) -> Bool {
@@ -52,10 +53,14 @@ struct GmailPushState: Codable, Equatable, Sendable {
 }
 
 extension GmailAccount {
+    func pushRegistrationIsValid(at now: Date) -> Bool {
+        guard let push, push.registrationExpiration > now,
+              let watch = push.watchExpiration, watch > now else { return false }
+        return true
+    }
     func pushIsHealthy(at now: Date) -> Bool {
-        guard pushIssue == nil, let push,
-              push.registrationExpiration.timeIntervalSince(now) > 0,
-              let watch = push.watchExpiration, watch.timeIntervalSince(now) > 0 else { return false }
+        guard pushIssue == nil, pushRegistrationIsValid(at: now), let heartbeat = push?.deliveryHeartbeat,
+              now.timeIntervalSince(heartbeat) >= -60, now.timeIntervalSince(heartbeat) <= 120 else { return false }
         return true
     }
 }
@@ -237,22 +242,24 @@ final class GmailPushBackend: Sendable {
         }
     }
 
-    func listen(state: GmailPushState, channelToken: String, onEvent: @escaping @Sendable (String) async -> Void) async throws {
+    func listen(state: GmailPushState, channelToken: String, onAlive: @escaping @Sendable () async -> Void, onEvent: @escaping @Sendable (String) async -> Void) async throws {
         var components = URLComponents(url: configuration.url(path: "v1/connect"), resolvingAgainstBaseURL: false)!
         components.scheme = "wss"
         components.queryItems = [URLQueryItem(name: "accountKey", value: state.accountKey), URLQueryItem(name: "deviceId", value: state.deviceID)]
         var request = URLRequest(url: components.url!); request.timeoutInterval = 30
         request.setValue("Bearer " + channelToken, forHTTPHeaderField: "Authorization")
-        try await Self.receiveEvents(socket: GmailPushSessionSocket(task: socketSession.webSocketTask(with: request)), onEvent: onEvent)
+        try await Self.receiveEvents(socket: GmailPushSessionSocket(task: socketSession.webSocketTask(with: request)), onAlive: onAlive, onEvent: onEvent)
     }
 
-    static func receiveEvents(socket: any GmailPushSocket, onEvent: @escaping @Sendable (String) async -> Void) async throws {
+    static func receiveEvents(socket: any GmailPushSocket, onAlive: @escaping @Sendable () async -> Void = {}, onEvent: @escaping @Sendable (String) async -> Void) async throws {
         socket.resume()
         let heartbeat = Task {
             do {
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(45))
                     try await withDeadline(seconds: 15) { try await socket.ping() }
+                    try Task.checkCancellation()
+                    await onAlive()
                 }
             } catch { if !Task.isCancelled { socket.cancel() } }
         }
@@ -269,6 +276,8 @@ final class GmailPushBackend: Sendable {
                 guard data.count <= 4_096 else { throw PortraitError.message("Instant update channel returned an oversized message.") }
                 let event = try JSONDecoder().decode(GmailPushWireEvent.self, from: data)
                 guard event.type == "gmail-history", Self.validHistory(event.historyId) else { continue }
+                try Task.checkCancellation()
+                await onAlive()
                 await onEvent(event.historyId)
             }
             try Task.checkCancellation()
@@ -297,18 +306,22 @@ struct GmailPushHTTPError: LocalizedError, Sendable {
 
 enum GmailPushListener {
     static func run(configuration: GmailPushConfiguration, state: GmailPushState, channelToken: String,
-                    onEvent: @escaping @Sendable (String) async -> Void) async {
+                    accountID: String, root: URL, onEvent: @escaping @Sendable (String) async -> Void) async {
+        let presence = GmailPushPresence(root: root), connectionID = UUID().uuidString, connectionStartedAt = Date()
         var delay: Double = 1
         while !Task.isCancelled {
             do {
-                try await GmailPushBackend(configuration: configuration).listen(state: state, channelToken: channelToken, onEvent: onEvent)
+                try await GmailPushBackend(configuration: configuration).listen(state: state, channelToken: channelToken, onAlive: {
+                    try? presence.alive(accountID: accountID, connectionID: connectionID, connectionStartedAt: connectionStartedAt)
+                }, onEvent: onEvent)
                 delay = 1
-            } catch is CancellationError { return }
-            catch {
+            } catch {
+                try? presence.disconnected(accountID: accountID, connectionID: connectionID)
                 guard !Task.isCancelled else { return }
                 try? await Task.sleep(for: .seconds(delay))
                 delay = min(delay * 2, 60)
             }
         }
+        try? presence.disconnected(accountID: accountID, connectionID: connectionID)
     }
 }

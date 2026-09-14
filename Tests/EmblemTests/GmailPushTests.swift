@@ -231,9 +231,61 @@ final class GmailPushTests: XCTestCase {
         XCTAssertNil(model.gmail.accounts[0].issue)
     }
 
+    func testRegisteredWatchWithoutLiveSocketRetainsRegularFallback() {
+        let now = Date()
+        let state = GmailPushState(accountKey: String(repeating: "a", count: 64), deviceID: UUID().uuidString,
+                                   registeredAt: now, registrationExpiration: now.addingTimeInterval(180 * 86_400),
+                                   watchExpiration: now.addingTimeInterval(7 * 86_400), lastWatchRenewal: now)
+        let account = GmailAccount(id: "account", email: "fixture@gmail.com", push: state)
+        XCTAssertFalse(account.pushIsHealthy(at: now), "A saved watch does not prove a live delivery channel")
+        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, accounts: [account], now: now), 60)
+    }
+
+    func testPresenceHeartbeatExpiresAndOldDisconnectCannotEraseNewSocket() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let presence = GmailPushPresence(root: directory), now = Date()
+        XCTAssertNil(try presence.lastAlive(accountID: "account", now: now))
+        try presence.alive(accountID: "account", connectionID: "old", connectionStartedAt: now, now: now)
+        XCTAssertEqual(try presence.lastAlive(accountID: "account", now: now), now)
+        try presence.alive(accountID: "account", connectionID: "new", connectionStartedAt: now.addingTimeInterval(1), now: now.addingTimeInterval(1))
+        try presence.alive(accountID: "account", connectionID: "old", connectionStartedAt: now, now: now.addingTimeInterval(2))
+        try presence.disconnected(accountID: "account", connectionID: "old")
+        XCTAssertNotNil(try presence.lastAlive(accountID: "account", now: now.addingTimeInterval(2)))
+        XCTAssertNil(try presence.lastAlive(accountID: "account", now: now.addingTimeInterval(122)))
+        try presence.disconnected(accountID: "account", connectionID: "new")
+        XCTAssertNil(try presence.lastAlive(accountID: "account", now: now.addingTimeInterval(2)))
+        let record = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory.appendingPathComponent("gmail-push-presence"), includingPropertiesForKeys: nil).first { $0.pathExtension == "json" })
+        try Data("{".utf8).write(to: record, options: .atomic)
+        try presence.alive(accountID: "account", connectionID: "new", connectionStartedAt: now.addingTimeInterval(1), now: now.addingTimeInterval(3))
+        XCTAssertNotNil(try presence.lastAlive(accountID: "account", now: now.addingTimeInterval(4)), "An authenticated heartbeat repairs corrupt non-authoritative presence state")
+        try presence.remove(accountID: "account")
+        XCTAssertNil(try presence.lastAlive(accountID: "account", now: now))
+    }
+
+    func testLiveChannelKeepsExactGmailPrimaryAndOfflineChannelRestoresFallback() {
+        let now = Date()
+        var account = GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now.addingTimeInterval(-900)), push: healthyPush(now: now))
+        XCTAssertEqual(MailProviderRouting.primaryEmails([account], now: now), ["fixture@gmail.com"])
+        account.push?.deliveryHeartbeat = nil
+        XCTAssertTrue(MailProviderRouting.primaryEmails([account], now: now).isEmpty)
+        XCTAssertTrue(account.pushRegistrationIsValid(at: now), "Keep trying the registered socket even while regular sync is the fallback")
+    }
+
+    func testValidFrameRecordsLivenessBeforeWakingHistorySync() async throws {
+        let socket = PushSocketFixture([.string(#"{"type":"gmail-history","historyId":"0"}"#), .string(String(repeating: "x", count: 4_097))])
+        let events = PushEventFixture()
+        do {
+            try await GmailPushBackend.receiveEvents(socket: socket, onAlive: { await events.append("alive") }) { await events.append($0) }
+            XCTFail("Oversized frame was accepted")
+        } catch {}
+        let values = await events.values
+        XCTAssertEqual(values, ["alive", "0"])
+    }
+
     private func healthyPush(now: Date) -> GmailPushState {
         .init(accountKey: String(repeating: "a", count: 64), deviceID: UUID().uuidString, registeredAt: now,
-              registrationExpiration: now.addingTimeInterval(180 * 86_400), watchExpiration: now.addingTimeInterval(7 * 86_400), lastWatchRenewal: now)
+              registrationExpiration: now.addingTimeInterval(180 * 86_400), watchExpiration: now.addingTimeInterval(7 * 86_400), lastWatchRenewal: now, deliveryHeartbeat: now)
     }
     @MainActor private func fixtureModel(root: URL) -> AppModel {
         let model = AppModel(demo: false, rootOverride: root)

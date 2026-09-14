@@ -13,6 +13,14 @@ extension AppModel {
                 }
             }
         }
+        refreshGmailPushDelivery()
+    }
+    func refreshGmailPushDelivery(now:Date=Date()) {
+        let presence=GmailPushPresence(root:root)
+        for index in gmail.accounts.indices where gmail.accounts[index].push != nil {
+            let heartbeat=try? presence.lastAlive(accountID:gmail.accounts[index].id,now:now)
+            if gmail.accounts[index].push?.deliveryHeartbeat != heartbeat {gmail.accounts[index].push?.deliveryHeartbeat=heartbeat}
+        }
     }
     func saveGmail()throws {
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
@@ -76,6 +84,7 @@ extension AppModel {
                 }
                 try self.gmailAuthorization.forget(accountID:id)
                 self.gmailForcedAccountIDs.remove(id)
+                try? GmailPushPresence(root:self.root).remove(accountID:id)
                 self.gmail.accounts.removeAll{$0.id==id};try self.saveGmail()
                 self.refreshForegroundGmailPushListener(backgroundServiceActive:self.mailSync.background && BackgroundService.service.status == .enabled)
                 self.backgroundPreferenceChanged?()
@@ -192,6 +201,7 @@ extension AppModel {
 
     func noteGmailPush(accountID:String,historyID:String,receivedAt:Date=Date()) {
         guard gmail.accounts.contains(where:{$0.id==accountID}),GmailPushBackend.validHistory(historyID) else{return}
+        refreshGmailPushDelivery()
         if let i=gmail.accounts.firstIndex(where:{$0.id==accountID}) {gmail.accounts[i].push?.lastPush=receivedAt;gmail.accounts[i].pushIssue=nil;try? saveGmail()}
         kickGmailSync(now:Date(),forceAccountIDs:[accountID])
     }
@@ -207,16 +217,17 @@ extension AppModel {
         gmailPushListenerTask?.cancel();gmailPushListenerTask=nil
         guard !backgroundServiceActive,!isShuttingDown,automaticEnabled,let configuration=GmailPushConfiguration.current() else{return}
         let descriptors=gmail.accounts.compactMap { account -> (String,GmailPushState,String)? in
-            guard account.pushIsHealthy(at:Date()),let state=account.push,
+            guard account.pushRegistrationIsValid(at:Date()),let state=account.push,
                   let token=try? GmailPushCredentials.channelToken(accountID:account.id) else{return nil}
             return (account.id,state,token)
         }
         guard !descriptors.isEmpty else{return}
+        let listenerRoot=root
         gmailPushListenerTask=Task { [weak self] in
             await withTaskGroup(of:Void.self) {group in
                 for (id,state,token) in descriptors {
                     group.addTask {
-                        await GmailPushListener.run(configuration:configuration,state:state,channelToken:token) {history in
+                        await GmailPushListener.run(configuration:configuration,state:state,channelToken:token,accountID:id,root:listenerRoot) {history in
                             await MainActor.run {self?.noteGmailPush(accountID:id,historyID:history)}
                         }
                     }

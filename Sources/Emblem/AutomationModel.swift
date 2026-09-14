@@ -141,6 +141,7 @@ extension AppModel {
         !showImport && !showScan && undoRecord == nil
     }
     func automaticTick(now: Date = Date()) {
+        refreshGmailPushDelivery(now:now)
         consumeGmailPushInbox()
         kickGmailPushMaintenance(now:now)
         kickGmailSync(now:now)
