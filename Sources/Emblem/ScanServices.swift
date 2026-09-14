@@ -41,8 +41,10 @@ struct MailScanMailbox: Sendable, Hashable {
     var reference: Int = 0
 }
 struct MailScanInventory: Sendable { var mailboxes: [MailScanMailbox]; var warnings: [String] }
-struct MailScanPage: Sendable { var senders: [String]; var currentCount: Int; var unreadable: Int = 0; var receivedAt:[Date?] = [] }
+struct MailScanPage: Sendable { var senders: [String]; var currentCount: Int; var unreadable: Int = 0; var receivedAt:[Date?] = []; var excludedRecipientEmails:Set<String> = [] }
 protocol MailScannerPort: Sendable {
+    func recentSent(since:Date,excludingAccountEmails:Set<String>) async throws -> MailScanPage?
+    func sentPage(start:Int,size:Int,excludingAccountEmails:Set<String>) async throws -> MailScanPage?
     func recentInbox(since:Date) async throws -> MailScanPage?
     func recentInbox(since:Date,excludingAccountEmails:Set<String>) async throws -> MailScanPage?
     func inventory(source:ScanSource,excludingAccountEmails:Set<String>) async throws -> MailScanInventory
@@ -50,6 +52,8 @@ protocol MailScannerPort: Sendable {
     func page(mailbox: MailScanMailbox, start: Int, size: Int) async throws -> MailScanPage
 }
 extension MailScannerPort {
+    func recentSent(since:Date,excludingAccountEmails:Set<String>)async throws->MailScanPage? {nil}
+    func sentPage(start:Int,size:Int,excludingAccountEmails:Set<String>)async throws->MailScanPage? {nil}
     func recentInbox(since:Date,excludingAccountEmails:Set<String>)async throws->MailScanPage? {
         // Older adapters cannot scope accounts: keep their original path, which
         // is lossless and deduplicated at sender ingestion.
@@ -123,6 +127,20 @@ indirect enum ScriptValue: Codable, Sendable {
 }
 
 struct LiveMailScanner: MailScannerPort {
+    func recentSent(since:Date,excludingAccountEmails:Set<String>)async throws->MailScanPage? {
+        try await sentData("scanrecentsent",arguments:[.date(since),.list(excludingAccountEmails.sorted().map{.text($0)})])
+    }
+    func sentPage(start:Int,size:Int,excludingAccountEmails:Set<String>)async throws->MailScanPage? {
+        guard start>=1,size>0,size<=200 else{throw PortraitError.message("The Sent page range is invalid.")}
+        return try await sentData("scansentpage",arguments:[.number(start),.number(size),.list(excludingAccountEmails.sorted().map{.text($0)})])
+    }
+    private func sentData(_ handler:String,arguments:[ScriptValue])async throws->MailScanPage? {
+        let values=try await MailScanScriptRunner.shared.call(handler,arguments:arguments).values
+        guard values.count==5 else{throw PortraitError.message("Mail returned incomplete Sent metadata.")}
+        let own=Set(values[4].values.flatMap{EmailAddress.parseList($0.string).map(\.value)})
+        return .init(senders:values[0].values.map(\.string),currentCount:values[1].integer,unreadable:values[2].integer,receivedAt:values[3].values.map(\.date),excludedRecipientEmails:own)
+    }
+
     func recentInbox(since:Date)async throws->MailScanPage? {
         try await recentInbox(since:since,excludingAccountEmails:[])
     }
@@ -166,7 +184,7 @@ struct LiveMailScanner: MailScannerPort {
 }
 
 enum MailScanScripts {
-    // Only account/mailbox labels, counts, message IDs, sender and received dates are read. No body, subject,
+    // Only account/mailbox labels, counts, IDs, From/To/Cc and received/sent dates are read. No body, subject,
     // attachments, credentials, message source, or read-status mutation.
     static let source = #"""
     property scanReferences : {}
@@ -317,6 +335,86 @@ enum MailScanScripts {
             end tell
         end timeout
     end scanRoutedRecent
+    on scanSentPage(firstIndex, pageSize, primaryEmails)
+        tell application "Mail"
+            set targetBox to sent mailbox
+            set itemCount to count of messages of targetBox
+            if firstIndex > itemCount then return {{}, itemCount, 0, {}, {}}
+            set lastIndex to firstIndex + pageSize - 1
+            if lastIndex > itemCount then set lastIndex to itemCount
+            set pageIDs to id of (messages firstIndex thru lastIndex of targetBox)
+            set messageRefs to messages firstIndex thru lastIndex of targetBox
+        end tell
+        set resultRows to my collectSent(messageRefs, itemCount, primaryEmails)
+        tell application "Mail"
+            set stableIDs to id of (messages firstIndex thru lastIndex of targetBox)
+        end tell
+        if pageIDs is not equal to stableIDs then error "Sent mailbox changed during read" number -1728
+        return resultRows
+    end scanSentPage
+    on scanRecentSent(sinceDate, primaryEmails)
+        tell application "Mail"
+            set messageRefs to messages of sent mailbox whose date sent is greater than or equal to sinceDate
+            set itemCount to count of messageRefs
+            if itemCount > 200 then return {{}, itemCount, 0, {}, {}}
+        end tell
+        return my collectSent(messageRefs, itemCount, primaryEmails)
+    end scanRecentSent
+    on quoteRecipientName(nameValue)
+        set resultName to quote
+        repeat with nameCharacter in characters of (nameValue as text)
+            set characterValue to nameCharacter as text
+            if characterValue is quote or characterValue is "\\" then set resultName to resultName & "\\"
+            if characterValue is linefeed or characterValue is return then set characterValue to " "
+            set resultName to resultName & characterValue
+        end repeat
+        return resultName & quote
+    end quoteRecipientName
+    on collectSent(messageRefs, itemCount, primaryEmails)
+        set pageDeadline to (current date) + 15
+        set addressFields to {}
+        set dateFields to {}
+        set ownFields to {}
+        set unreadableCount to 0
+        with timeout of 15 seconds
+            tell application "Mail"
+                repeat with acct in accounts
+                    if enabled of acct then set ownFields to ownFields & (email addresses of acct)
+                end repeat
+                repeat with messageRef in messageRefs
+                    if (current date) >= pageDeadline then error "Mail Sent page exceeded time budget" number -1712
+                    try
+                        set skipMessage to false
+                        try
+                            set owningAccount to account of mailbox of messageRef
+                            if owningAccount is not missing value then set skipMessage to my accountUsesGmail(owningAccount, primaryEmails)
+                        end try
+                        set sentDate to date sent of messageRef
+                        set recipientText to ""
+                        if not skipMessage then
+                            set end of ownFields to sender of messageRef
+                            set recipientRefs to (to recipients of messageRef) & (cc recipients of messageRef)
+                            repeat with recipientRef in recipientRefs
+                                set recipientAddress to address of recipientRef
+                                set recipientName to name of recipientRef
+                                if recipientAddress is not missing value then
+                                    if recipientName is missing value then set recipientName to ""
+                                    set recipientText to recipientText & my quoteRecipientName(recipientName) & " <" & recipientAddress & ">" & linefeed
+                                end if
+                            end repeat
+                        end if
+                        set end of addressFields to recipientText
+                        set end of dateFields to sentDate
+                    on error
+                        set end of addressFields to ""
+                        set end of dateFields to missing value
+                        set unreadableCount to unreadableCount + 1
+                    end try
+                end repeat
+            end tell
+        end timeout
+        return {addressFields, itemCount, unreadableCount, dateFields, ownFields}
+    end collectSent
     on scanPageAt(acctKey, pathParts, firstIndex, pageSize)
         with timeout of 15 seconds
             tell application "Mail"

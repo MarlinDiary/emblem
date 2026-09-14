@@ -62,7 +62,7 @@ final class V016GmailTests:XCTestCase {
         catch let error as GmailHTTPError {XCTAssertEqual(error.status,429)}
     }
     func testDeletedMessageIsNotAnErrorAndArchivedMessagesAreExcluded()async throws {
-        let transport=GmailTransportFixture([root+"history":[(200,#"{"historyId":"150","history":[{"messagesAdded":[{"message":{"id":"abc"}},{"message":{"id":"def"}}]}]}"#)],root+"messages/abc":[(404,"{}")],root+"messages/def":[(200,#"{"id":"def","labelIds":["SENT"]}"#)]])
+        let transport=GmailTransportFixture([root+"history":[(200,#"{"historyId":"150","history":[{"messagesAdded":[{"message":{"id":"abc"}},{"message":{"id":"def"}}]}]}"#)],root+"messages/abc":[(404,"{}")],root+"messages/def":[(200,#"{"id":"def","labelIds":["ARCHIVE"]}"#)]])
         let batch=try await GmailAPI(transport:transport).batch(cursor:GmailCursor(historyID:"100"),token:"fixture")
         XCTAssertTrue(batch.messages.isEmpty);XCTAssertEqual(batch.cursor.historyID,"150")
     }
@@ -70,7 +70,8 @@ final class V016GmailTests:XCTestCase {
         let client=GmailOAuthClient(clientID:"test.apps.googleusercontent.com")
         let a=GmailAuthorization.request(client:client,redirect:URL(string:"http://127.0.0.1:41001")!)
         let b=GmailAuthorization.request(client:client,redirect:URL(string:"http://127.0.0.1:41001")!)
-        XCTAssertEqual(a.scope,GmailAPI.scope);XCTAssertEqual(a.codeChallengeMethod,"S256")
+        let scopes=Set((a.scope ?? "").split(separator:" ").map(String.init))
+        XCTAssertTrue(Set(GmailAuthorization.identityScopes).isSubset(of:scopes));XCTAssertEqual(a.codeChallengeMethod,"S256")
         XCTAssertNotNil(a.codeVerifier);XCTAssertNotEqual(a.state,b.state)
         XCTAssertEqual(a.configuration.tokenEndpoint.absoluteString,"https://oauth2.googleapis.com/token")
     }

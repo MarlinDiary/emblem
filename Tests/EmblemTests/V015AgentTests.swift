@@ -22,19 +22,21 @@ final class V015AgentTests:XCTestCase {
         try Data("{\"pid\":2147483647}".utf8).write(to:r.appendingPathComponent(LibraryLease.requestName))
         XCTAssertFalse(LibraryLease.foregroundRequested(root:r))
     }
-    func testLaunchAgentIsBoundedSystemJobNotPermanentGuiProcess()throws {
+    func testLaunchAgentKeepsOnlyPushListenerAliveAndUsesBoundedFallback()throws {
         let source=URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let plist=source.appendingPathComponent("Resources/LaunchAgents/com.protoyard.emblem.sync.plist")
         let v=try XCTUnwrap(PropertyListSerialization.propertyList(from:Data(contentsOf:plist),format:nil) as? [String:Any])
         XCTAssertEqual(v["BundleProgram"] as? String,"Contents/MacOS/Emblem")
-        XCTAssertEqual(v["StartInterval"] as? Int,60);XCTAssertNil(v["KeepAlive"])
+        XCTAssertEqual(v["StartInterval"] as? Int,60)
+        XCTAssertEqual((v["KeepAlive"] as? [String:Any])?["SuccessfulExit"] as? Bool,false)
         XCTAssertEqual(v["ProgramArguments"] as? [String],["Emblem","--background-sync-agent"])
     }
     @MainActor func testBackgroundRegistrationRefreshesWhenBuildOrBundlePathChanges() {
         XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:nil,currentBuild:"29",registeredBundlePath:nil,currentBundlePath:"/Applications/Emblem.app"))
         XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"27",currentBuild:"29",registeredBundlePath:"/Applications/Emblem.app",currentBundlePath:"/Applications/Emblem.app"))
         XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/tmp/Emblem.app",currentBundlePath:"/Applications/Emblem.app"))
-        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/Applications/Emblem.app",currentBundlePath:"/Applications/Emblem.app"))
+        XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/Applications/Emblem.app",currentBundlePath:"/Applications/Emblem.app",registeredPushSignature:"account-a",currentPushSignature:"account-a"))
+        XCTAssertTrue(BackgroundService.shouldRefreshRegistration(isEnabled:true,registeredBuild:"29",currentBuild:"29",registeredBundlePath:"/Applications/Emblem.app",currentBundlePath:"/Applications/Emblem.app",registeredPushSignature:"",currentPushSignature:"account-a"))
         XCTAssertFalse(BackgroundService.shouldRefreshRegistration(isEnabled:false,registeredBuild:"27",currentBuild:"29",registeredBundlePath:"/tmp/Emblem.app",currentBundlePath:"/Applications/Emblem.app"))
     }
     @MainActor func testShutdownDoesNotStartFollowupContactWrites()throws {

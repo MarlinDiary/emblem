@@ -9,9 +9,11 @@ private actor AutoClient: ResourceFetching {
     var requests = [URL]()
     let delay: UInt64
     let failure: Bool
-    init(png: Data, delay: UInt64 = 0, failure: Bool = false) { self.png=png; self.delay=delay; self.failure=failure }
+    let slowHost: String?
+    init(png: Data, delay: UInt64 = 0, failure: Bool = false, slowHost: String? = nil) { self.png=png; self.delay=delay; self.failure=failure; self.slowHost=slowHost }
     func fetch(_ url: URL, limit: Int) async throws -> WebResource {
         requests.append(url)
+        if url.host == slowHost {try await Task.sleep(for:.seconds(2))}
         if delay > 0 { try await Task.sleep(nanoseconds:delay) }
         try Task.checkCancellation()
         if failure { throw HTTPResourceError(status:503) }
@@ -52,6 +54,58 @@ final class AutomationTests: XCTestCase {
             try await Task.sleep(nanoseconds:1_000_000)
         }
         XCTFail("Automatic work did not settle")
+    }
+    @MainActor func testSlowAvatarLookupSurvivesOverlappingContactsSync() async throws {
+        let (m,root,_) = try model(delay:100_000_000)
+        defer {m.syncPassRunning=false;m.stopAutomaticWork();try? FileManager.default.removeItem(at:root)}
+        m.automation.setupComplete=true;m.useWebsite=true;m.automaticEnabled=true
+        m.rows=[SenderRow(email:EmailAddress("fresh@company.org")!,name:"Fresh")]
+        m.kickAutomaticLookup()
+        try await Task.sleep(for:.milliseconds(20))
+        m.syncPassRunning=true
+        if let task=m.automaticTask {await task.value}
+        XCTAssertNotNil(m.rows[0].lastLookup,"Contacts sync must not discard a completed network lookup")
+        XCTAssertNotNil(m.rows[0].chosen)
+        XCTAssertTrue(try m.engine.records().isEmpty,"Network lookup alone does not mutate Contacts")
+        m.syncPassRunning=false
+        m.rows.append(SenderRow(email:EmailAddress("another@company.org")!,name:"Another"))
+        m.syncPassRunning=true
+        m.kickAutomaticLookup()
+        XCTAssertNotNil(m.automaticTask,"A new Gmail participant must not lose its lookup wakeup during sync")
+        if let task=m.automaticTask {await task.value}
+        XCTAssertNotNil(m.rows[1].lastLookup)
+    }
+    @MainActor func testFreshRecipientRunsAheadOfUnresolvedArchiveBacklog() async throws {
+        let (m,root,client)=try model(delay:20_000_000)
+        defer {m.stopAutomaticWork();try? FileManager.default.removeItem(at:root)}
+        m.automation.setupComplete=true;m.useWebsite=true;m.selectedID=nil
+        let old=Date(timeIntervalSince1970:100), fresh=Date()
+        m.rows=(0..<6).map {SenderRow(email:EmailAddress("old@a\($0).org")!,name:"Archive",discoveredAt:old)}
+        m.rows.append(SenderRow(email:EmailAddress("new@zzfresh.org")!,name:"Fresh",discoveredAt:fresh))
+        try await m.automaticallyResolve(now:Date())
+        let requests=await client.requests
+        var seen=Set<String>()
+        let firstThree=requests.compactMap(\.host).filter{seen.insert($0).inserted}.prefix(3)
+        XCTAssertTrue(firstThree.contains("zzfresh.org"),"New mail must not wait behind alphabetical archive jobs")
+        XCTAssertNotNil(m.rows.last?.lastLookup)
+    }
+    @MainActor func testResolvedAvatarWakesSyncBeforeSlowQueueFinishes() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let client=AutoClient(png:try DemoImages.candidate(symbol:"star",color:.systemBlue).png,slowHost:"zslow.org")
+        let m=AppModel(demo:false,rootOverride:root,resolverFactory:{AvatarResolver(client:client)})
+        defer {m.mailSync.enabled=false;m.syncTask?.cancel();m.stopAutomaticWork();try? FileManager.default.removeItem(at:root)}
+        m.automation.setupComplete=true;m.useWebsite=true;m.mailSync.enabled=true
+        m.rows=[SenderRow(email:EmailAddress("fast@afast.org")!,name:"Fast"),SenderRow(email:EmailAddress("slow@zslow.org")!,name:"Slow")]
+        m.kickAutomaticLookup()
+        for _ in 0..<500 where m.rows[0].lastLookup == nil {try await Task.sleep(for:.milliseconds(1))}
+        XCTAssertNotNil(m.rows[0].lastLookup)
+        XCTAssertNil(m.rows[1].lastLookup)
+        XCTAssertNotNil(m.automaticTask,"The slow queue is still running")
+        XCTAssertNotNil(m.syncTask,"Each resolved avatar must wake the sync consumer immediately")
+        // Stop the scheduled 350ms consumer before it performs any live I/O.
+        m.syncTask?.cancel();m.mailSync.enabled=false;m.stopAutomaticWork()
+        if let task=m.automaticTask {await task.value}
+        XCTAssertTrue(try m.engine.records().isEmpty)
     }
     @MainActor func testNothingStartsBeforeOneTimeSetup() async throws {
         let (m,root,client) = try model(); defer { try? FileManager.default.removeItem(at:root) }

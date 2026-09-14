@@ -1,0 +1,4 @@
+HMAC_SECRET=replace-with-at-least-32-random-bytes
+GOOGLE_CLIENT_ID=replace-with-desktop-client-id.apps.googleusercontent.com
+PUBSUB_AUDIENCE=https://push.emblem.protoyard.com/v1/google-push
+PUBSUB_SERVICE_ACCOUNT=emblem-pubsub-push@replace-with-project-id.iam.gserviceaccount.com

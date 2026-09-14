@@ -107,10 +107,15 @@ struct SenderRow: Identifiable, Codable, Sendable {
     @Published var gmailConnecting = false
     @Published var gmailIssue: String?
     var gmailSyncTask: Task<Void,Never>?
+    var gmailSentBootstrapTask: Task<GmailBatch,Error>?
     var gmailSignInTask: Task<Void,Never>?
+    var gmailPushMaintenanceTask: Task<Void,Never>?
+    var gmailPushListenerTask: Task<Void,Never>?
+    var gmailForcedAccountIDs=Set<String>()
     lazy var gmailAuthorization = GmailAuthorization()
     var gmailAPI = GmailAPI()
     var gmailTokenProvider: ((String) async throws -> String)?
+    var rowsSnapshotEncoder: (([SenderRow]) async throws -> Data)?
     @Published var useGravatar = false { didSet { automaticSourcesChanged() } }
     @Published var useWebsite = false { didSet { automaticSourcesChanged() } }
     @Published var automaticEnabled = true { didSet { if !automaticEnabled { stopAutomaticWork() }; saveAutomationPreferences() } }
@@ -201,7 +206,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
         else { showSourceConsent = true }
     }
 
-    init(demo: Bool, rootOverride: URL? = nil, resolverFactory: @escaping () -> AvatarResolver = { AvatarResolver() }, mailScanner: (any MailScannerPort)? = nil, contactScanner: (any ContactsScannerPort)? = nil,backgroundWorkAllowed:Bool=true) {
+    init(demo: Bool, rootOverride: URL? = nil, resolverFactory: @escaping () -> AvatarResolver = { AvatarResolver() }, mailScanner: (any MailScannerPort)? = nil, contactScanner: (any ContactsScannerPort)? = nil,backgroundWorkAllowed:Bool=true,contactStore:(any ContactStorePort)?=nil) {
         self.backgroundWorkAllowed=backgroundWorkAllowed
         self.resolverFactory = resolverFactory
         self.mailScanner = mailScanner ?? LiveMailScanner()
@@ -209,7 +214,8 @@ struct SenderRow: Identifiable, Codable, Sendable {
         usesLiveMailScan = mailScanner == nil; usesLiveContactScan = contactScanner == nil
         self.demo = demo
         root = rootOverride ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(demo ? "Emblem-Demo" : "Emblem", isDirectory: true)
-        if demo {
+        if let contactStore {port=contactStore}
+        else if demo {
             do { port = try FixtureContactStore(url: root.appendingPathComponent("fixture-contacts.json")) }
             catch { port = try! FixtureContactStore(); launchError = "Demo library could not be read: \(error.localizedDescription)" }
         } else { port = apple }

@@ -43,7 +43,7 @@ Automatic Contacts sync is opt-in. Once enabled, new eligible senders and select
 
 ### Background operation
 
-**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. It runs approximately once a minute while the user is logged in and the Mac is awake. It is polling, not push.
+**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. It runs approximately once a minute while the user is logged in and the Mac is awake. The tagged 0.19.0 release uses polling. The development branch adds Gmail instant updates; see [Push operations and acceptance](docs/gmail-push-operations.md).
 
 The foreground app and background job share an exclusive library lease, so they do not write the local library or Contacts concurrently.
 
@@ -98,6 +98,10 @@ EMBLEM_GOOGLE_CLIENT_ID='YOUR_CLIENT_ID.apps.googleusercontent.com' \
 
 A broadly distributed OAuth client must satisfy Google's consent-screen and restricted-scope requirements. Testing-mode grants may have shorter lifetimes.
 
+## Gmail Push and outgoing discovery development
+
+`Push/` contains the optional Cloudflare relay, with RSA-verified Google registration and authenticated Pub/Sub delivery. The Mac receives hints over a persistent, OS-managed background WebSocket, replays its saved Gmail history cursor and renews the watch automatically. This needs deployment in the desktop client's Google Cloud project plus real-mail acceptance before a release. [Setup, timing, privacy and rollback](docs/gmail-push-operations.md).
+
 ## Privacy and security
 
 - Sender addresses, cached images, settings, and mutation journals stay under `~/Library/Application Support/Emblem/` with restricted permissions.
@@ -141,3 +145,5 @@ Issues and pull requests are welcome. Use synthetic fixtures, keep all I/O bound
 ## License
 
 MIT. See [LICENSE](LICENSE) and [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md).
+
+The development branch also discovers the **To/Cc recipients of sent mail**, including people who have never emailed you. Gmail still uses `gmail.metadata`; it requests only From/To/Cc, IDs, labels and dates, not Bcc, bodies or subjects. Sent history and watch hints enter the same automatic avatar lookup and journaled Contacts sync as inbox senders. Legacy accounts backfill Sent separately without discarding their accepted inbox cursor. Apple Mail has an independent paged Sent import and overlapping recent delta when Gmail is unavailable. Outgoing activity does not replace inbox recency, and your own send-as addresses and ignored identities are excluded.

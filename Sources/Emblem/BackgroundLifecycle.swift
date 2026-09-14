@@ -12,6 +12,6 @@ import AppKit
         return true
     }
     func applicationWillTerminate(_ notification:Notification) {
-        Self.model?.isShuttingDown=true;Self.model?.stopAutomaticWork();Self.model?.syncTask?.cancel();Self.model?.save()
+        Self.model?.isShuttingDown=true;Self.model?.stopAutomaticWork();Self.model?.stopGmailPushListening();Self.model?.syncTask?.cancel();Self.model?.save()
     }
 }

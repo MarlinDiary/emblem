@@ -21,6 +21,11 @@ final class LibraryLease {
         }
         return LibraryLease(root:root,fd:fd)
     }
+    static func writerIsBusy(root:URL)throws->Bool {
+        guard let probe=try acquire(root:root) else{return true}
+        withExtendedLifetime(probe){}
+        return false
+    }
     static func requestForeground(root:URL)throws {
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         let data=try JSONSerialization.data(withJSONObject:["pid":getpid()])

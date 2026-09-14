@@ -21,6 +21,10 @@ struct EmblemApp: App {
         if args.contains("--live-v094-smoke") { LiveV094Smoke.run(arguments: args); exit(0) }
         if args.contains("--v094-state-smoke") { exit(V094StateSmoke.run(arguments: args)) }
         if args.contains("--live-icon-smoke") { LiveIconSmoke.run(); exit(0) }
+        // The bundle starts as an agent so disposable Mail scanners and the
+        // login helper never enter the Dock. Only a visible session is promoted;
+        // diagnostics above must remain agent-only as well.
+        NSApplication.shared.setActivationPolicy(.regular)
         _session = StateObject(wrappedValue: AppSession(arguments: args))
     }
     var body: some Scene {

@@ -8,6 +8,7 @@ import PortraitCore
     @MainActor static func main() {
         let args=CommandLine.arguments
         EmblemMigration.migratePreferences()
+        if args.contains("--gmail-status") {exit(GmailStatus.run(arguments:args))}
         if args.contains("--lease-fixture") {exit(LibraryLease.fixture(arguments:args))}
         if args.contains("--headless-fixture") {
             do {
