@@ -16,6 +16,7 @@ import PortraitCore
     private struct RunningListener {var signature:String;var task:Task<Void,Never>}
     private static var processingWake=false
     private static var queuedWake=false
+    private static let modelCache=BackgroundModelCache()
 
     nonisolated static func fallbackInterval(mailEnabled:Bool,accounts:[GmailAccount],now:Date)->TimeInterval {
         // Push must not slow down another mailbox that still uses regular sync.
@@ -69,6 +70,7 @@ import PortraitCore
         var foregroundWasBusy=(try? LibraryLease.writerIsBusy(root:root)) ?? true
         defer {for listener in running.values {listener.task.cancel()}}
         while !Task.isCancelled && backgroundEnabled(root:root) {
+            if LibraryLease.foregroundRequested(root:root) {modelCache.discard()}
             let descriptors=listenerDescriptors(root:root),ids=Set(descriptors.map(\.accountID))
             for (id,listener) in running where !ids.contains(id) {listener.task.cancel();running.removeValue(forKey:id)}
             for descriptor in descriptors where running[descriptor.accountID]?.signature != descriptor.signature {
@@ -112,7 +114,8 @@ import PortraitCore
     }
 
     private static func processOnce(root:URL)async->Int32 {
-        guard !LibraryLease.foregroundRequested(root:root),let lease=try? LibraryLease.acquire(root:root) else{return 0}
+        if LibraryLease.foregroundRequested(root:root) {modelCache.discard();return 0}
+        guard let lease=try? LibraryLease.acquire(root:root) else{return 0}
         defer {withExtendedLifetime(lease){}}
         return await perform(root:root)
     }
@@ -122,7 +125,9 @@ import PortraitCore
         let automation=try? JSONDecoder().decode(AutomationPreferences.self,from:Data(contentsOf:root.appendingPathComponent("automation.json")))
         let target=NSAppleEventDescriptor(descriptorType:typeApplicationBundleID,data:Data("com.apple.mail".utf8))
         let mailAllowed=target.map {AEDeterminePermissionToAutomateTarget($0.aeDesc,typeWildCard,typeWildCard,false)==noErr} ?? false
-        let model=AppModel(demo:false,rootOverride:root)
+        let model:AppModel
+        do {model=try modelCache.model(root:root) {AppModel(demo:false,rootOverride:root)}}
+        catch {writeStatus("library-read-error",root:root,attention:error.localizedDescription);return 1}
         guard model.launchError == nil,model.automation.setupComplete else {writeStatus("setup-required",root:root,model:model);return 0}
         model.mailAutomationAvailable=mailAllowed
         if automation?.mail != false && !mailAllowed {model.automaticAttention="Apple Mail fallback needs permission. Gmail continues checking connected accounts."}
@@ -144,6 +149,8 @@ import PortraitCore
         for task in tasks {task.cancel()};for task in tasks {await task.value}
         do {try await model.saveAsync()}
         catch {writeStatus("save-error",root:root,model:model,attention:error.localizedDescription);return 1}
+        do {try modelCache.remember(model)}
+        catch {modelCache.discard()}
         writeStatus(yielded ? "yielded":"completed",root:root,model:model)
         print("BACKGROUND_AGENT=\(yielded ? "YIELDED":"COMPLETED") PID=\(getpid())")
         return 0
