@@ -133,6 +133,9 @@ import PortraitCore
         var yielded=false
         while model.gmailSyncTask != nil || model.gmailPushMaintenanceTask != nil || model.discoveryTask != nil || model.automaticTask != nil || model.syncTask != nil || model.isScanning {
             if LibraryLease.foregroundRequested(root:root) || Date()>=deadline || Task.isCancelled {yielded=true;break}
+            // The socket cannot take this writer lease. Keep replaying incoming
+            // hints while slower avatar/discovery/sync tasks are still running.
+            model.consumeGmailPushInbox()
             try? await Task.sleep(for:.milliseconds(200))
         }
         model.isShuttingDown=true

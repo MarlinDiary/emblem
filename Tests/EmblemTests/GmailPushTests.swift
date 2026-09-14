@@ -296,3 +296,12 @@ final class GmailPushTests: XCTestCase {
     }
 
 }
+
+extension GmailPushTests {
+    func testBackgroundWriterConsumesHintsWhileOtherWorkIsRunning() throws {
+        let root=URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source=try String(contentsOf:root.appendingPathComponent("Sources/Emblem/BackgroundSyncAgent.swift"))
+        let loop=try XCTUnwrap(source.components(separatedBy:"while model.gmailSyncTask != nil").last?.components(separatedBy:"model.isShuttingDown=true").first)
+        XCTAssertTrue(loop.contains("model.consumeGmailPushInbox()"),"An active writer must drain new hints without waiting for a 150-second avatar job")
+    }
+}
