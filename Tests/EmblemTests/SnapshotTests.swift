@@ -4,6 +4,12 @@ import AppKit
 import PortraitCore
 @testable import Emblem
 
+// Hosted runners have a 1024x768 virtual screen. Offscreen exports must not
+// silently constrain their requested canvas to that screen's visible frame.
+private final class SnapshotWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
 final class SnapshotTests: XCTestCase {
     // Offscreen layout exports supplement, but never replace, native window QA.
     // WindowServer-composited materials and toolbar chrome may be absent here.
@@ -146,8 +152,9 @@ final class SnapshotTests: XCTestCase {
     }
     @MainActor private func capture<V: View>(_ view:V,name:String,size:CGSize,scheme:ColorScheme,output:URL) async throws {
         NSApp.appearance = NSAppearance(named:scheme == .dark ? .darkAqua : .aqua)
-        let host=NSHostingView(rootView:view.preferredColorScheme(scheme).background(Color(nsColor: .windowBackgroundColor)))
-        let window=NSWindow(contentRect:CGRect(origin:.zero,size:size),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+        let host=NSHostingView(rootView:view.preferredColorScheme(scheme).frame(width:size.width,height:size.height).background(Color(nsColor: .windowBackgroundColor)))
+        host.sizingOptions = []
+        let window=SnapshotWindow(contentRect:CGRect(origin:.zero,size:size),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         window.animationBehavior = .none
         window.appearance=NSAppearance(named:scheme == .dark ? .darkAqua : .aqua)
         window.contentView=host; host.frame=CGRect(origin:.zero,size:size)
@@ -155,6 +162,8 @@ final class SnapshotTests: XCTestCase {
         window.orderBack(nil)
         defer { window.orderOut(nil) }
         for _ in 0..<8 { host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds:25_000_000) }
+        XCTAssertEqual(host.bounds.width,size.width,accuracy:1,name)
+        XCTAssertEqual(host.bounds.height,size.height,accuracy:1,name)
         guard let bitmap=host.bitmapImageRepForCachingDisplay(in:host.bounds) else { return XCTFail("missing bitmap") }
         host.cacheDisplay(in:host.bounds,to:bitmap)
         guard let png=bitmap.representation(using:.png,properties:[:]) else { return XCTFail("missing PNG") }
