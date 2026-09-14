@@ -22,8 +22,10 @@ silently switches back to the old flat icon.
 The deployment target stays macOS 14. Older systems use the compiler-generated
 fallback; supported systems render the layered appearance. The refractivity
 annotations were authored with Icon Composer 27 and verified with Xcode 27.
-Older compiler versions and OS appearance modes remain separate compatibility
-checks, not claims of completed cross-version runtime testing. The Icon Composer
+Xcode 26 builds the same vector foreground and standard native glass material
+using a temporary document with only the 27-specific refractivity annotations
+removed. It does not rasterize the icon or modify its editable source. Older OS
+appearance behavior remains a runtime check. The Icon Composer
 companion `ictool` was used to export and visually review Default, Dark and Mono
 at 1024px with design generations 26 and 27. These are native material renders,
 not image-editor approximations; the installed app was not replaced for review.

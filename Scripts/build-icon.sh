@@ -11,10 +11,35 @@ RESOURCES="$APP/Contents/Resources"
 [[ ! -e "$RESOURCES/Assets.car" ]] || { echo 'Assets.car already exists; leaving the bundle unchanged.' >&2; exit 2; }
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH"' EXIT
+ICON_SOURCE="$ROOT/Resources/AppIcon.icon"
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+SDK_MAJOR="${SDK_VERSION%%.*}"
+[[ "$SDK_MAJOR" -ge 26 ]] || { echo 'Icon compilation requires Xcode 26 or later.' >&2; exit 2; }
+if [[ "$SDK_MAJOR" == "26" ]]; then
+  # Xcode 26 accepts native Icon Composer documents, but not the 27-only
+  # refractivity feature. Keep the exact vector geometry and standard glass
+  # material in a temporary document; never flatten or alter the source icon.
+  python3 - "$ICON_SOURCE" "$SCRATCH/Source/AppIcon.icon" <<'PY'
+import json, shutil, sys
+from pathlib import Path
+source, compatible = map(Path, sys.argv[1:])
+shutil.copytree(source, compatible)
+path = compatible / 'icon.json'
+definition = json.loads(path.read_text())
+features = [f for f in definition.get('features', []) if f != 'refractivity']
+if features: definition['features'] = features
+else: definition.pop('features', None)
+for group in definition['groups']:
+    group.pop('refractivity', None)
+path.write_text(json.dumps(definition))
+PY
+  ICON_SOURCE="$SCRATCH/Source/AppIcon.icon"
+  echo 'ICON_MATERIAL=SYSTEM_GLASS COMPILER_GENERATION=26 REFRACTIVITY_27=OMITTED'
+fi
 # Absolute paths avoid the shared asset-tool daemon resolving paths against a
 # previous invocation's working directory. The native compiler owns all glass
 # rendering and automatically supplies the pre-Liquid-Glass .icns fallback.
-xcrun actool "$ROOT/Resources/AppIcon.icon" \
+xcrun actool "$ICON_SOURCE" \
   --compile "$SCRATCH" --output-format human-readable-text \
   --notices --warnings --errors \
   --output-partial-info-plist "$SCRATCH/partial-info.plist" \

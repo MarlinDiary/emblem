@@ -1,4 +1,5 @@
 import json
+import os
 import plistlib
 import tempfile
 import subprocess
@@ -11,6 +12,39 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class LayeredAppIconTests(unittest.TestCase):
+    def test_26_compatibility_keeps_native_geometry_without_27_annotations(self):
+        with tempfile.TemporaryDirectory(prefix="emblem 26 icon ") as directory:
+            root = Path(directory)
+            (root / "bin").mkdir()
+            wrapper = root / "bin/xcrun"
+            wrapper.write_text('''#!/usr/bin/python3
+import json, os, sys
+from pathlib import Path
+if sys.argv[1:] == ["--sdk", "macosx", "--show-sdk-version"]:
+    print("26.6")
+    sys.exit(0)
+if len(sys.argv)>2 and sys.argv[1]=="actool":
+    source=Path(sys.argv[2])
+    definition=json.loads((source/"icon.json").read_text())
+    assert "refractivity" not in definition.get("features", [])
+    assert len(definition["groups"])==1
+    assert "refractivity" not in definition["groups"][0]
+    assert definition["groups"][0]["layers"][0]["image-name"]=="Emblem.svg"
+    Path(os.environ["ICON_COMPAT_CAPTURE"]).write_bytes((source/"Assets/Emblem.svg").read_bytes())
+os.execv("/usr/bin/xcrun", ["xcrun"]+sys.argv[1:])
+''')
+            wrapper.chmod(0o700)
+            app = root / "Emblem.app"
+            (app / "Contents/Resources").mkdir(parents=True)
+            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleVersion": "54"}))
+            capture = root / "captured.svg"
+            environment = dict(os.environ, PATH=str(root / "bin")+os.pathsep+os.environ["PATH"], ICON_COMPAT_CAPTURE=str(capture))
+            result = subprocess.run(["bash", str(ROOT / "Scripts/build-icon.sh"), str(app)], capture_output=True, text=True, env=environment)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("COMPILER_GENERATION=26", result.stdout)
+            self.assertEqual(capture.read_bytes(), (ROOT / "Resources/AppIcon.icon/Assets/Emblem.svg").read_bytes())
+            self.assertTrue((app / "Contents/Resources/Assets.car").is_file())
+
     def test_portrait_and_ring_share_one_unbacked_foreground(self):
         icon = ROOT / "Resources/AppIcon.icon"
         definition = json.loads((icon / "icon.json").read_text())
