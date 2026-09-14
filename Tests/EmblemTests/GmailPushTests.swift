@@ -305,3 +305,14 @@ extension GmailPushTests {
         XCTAssertTrue(loop.contains("model.consumeGmailPushInbox()"),"An active writer must drain new hints without waiting for a 150-second avatar job")
     }
 }
+
+extension GmailPushTests {
+    func testColdStartupConnectsBeforeLongBackgroundWork() throws {
+        let root=URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source=try String(contentsOf:root.appendingPathComponent("Sources/Emblem/BackgroundSyncAgent.swift"))
+        let run=try XCTUnwrap(source.components(separatedBy:"static func run(arguments:").last?.components(separatedBy:"private static func backgroundEnabled").first)
+        let connect=try XCTUnwrap(run.range(of:"return await listen(root:root)")), pass=try XCTUnwrap(run.range(of:"await processOnce(root:root)"))
+        XCTAssertLessThan(connect.lowerBound,pass.lowerBound)
+        XCTAssertTrue(source.contains("var lastFallback=Date.distantPast"))
+    }
+}

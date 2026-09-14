@@ -36,12 +36,13 @@ import PortraitCore
         do {
             let root=try EmblemMigration.migrateLibraryIfNeeded()
             guard backgroundEnabled(root:root) else {writeStatus("disabled",root:root);return 0}
+            // Start registered sockets before any potentially long archive/avatar pass.
+            if GmailPushConfiguration.current() != nil,!listenerDescriptors(root:root).isEmpty {return await listen(root:root)}
             if !LibraryLease.foregroundRequested(root:root) {_=await processOnce(root:root)}
-            guard GmailPushConfiguration.current() != nil,!listenerDescriptors(root:root).isEmpty else {
+            do {
                 if LibraryLease.foregroundRequested(root:root) {writeStatus("foreground-active",root:root)}
                 return 0
             }
-            return await listen(root:root)
         } catch {print("BACKGROUND_AGENT_ERROR=\(error.localizedDescription)");return 1}
     }
 
@@ -64,7 +65,7 @@ import PortraitCore
     private static func listen(root:URL)async->Int32 {
         guard let configuration=GmailPushConfiguration.current() else{return 0}
         var running:[String:RunningListener]=[:]
-        var lastFallback=Date()
+        var lastFallback=Date.distantPast
         var foregroundWasBusy=(try? LibraryLease.writerIsBusy(root:root)) ?? true
         defer {for listener in running.values {listener.task.cancel()}}
         while !Task.isCancelled && backgroundEnabled(root:root) {
