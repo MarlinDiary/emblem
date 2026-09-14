@@ -91,3 +91,17 @@ followed by isolated worker launch, accessory startup and fixture undo on each O
 Natural72h observations have a separate record and remain pending. Neither
 real OAuth onboarding nor older-OS full GUI behavior is inferred from fixture CI.
 The temporary Sparkle acceptance feed is removed after45→46 acceptance.
+
+## Build53 bounded photo serialization
+
+The on-disk sender JSON array stays unchanged. Encoding now scopes one row at a
+time and reserves a bounded buffer, rather than building an entire Foundation
+base64 encoder tree. Existing asynchronous durability/revision guards remain.
+Same deterministic1000 independently allocated64000-byte payload rows:
+debug reference peak437.19MiB versus bounded163.91MiB. An isolated unchanged
+88,188,393-byte real library copy measured508.83MiB versus187.67MiB; all decoded
+fields, photo bytes and order compared equal. No live Contacts/library writes
+or account requests were made by these codec probes. Final signed release
+measurements and runtime CI have separate records. A short codec benchmark does
+not substitute for the fresh build53 natural72-hour resident cohort; the
+original build52 observations and peaks are retained.

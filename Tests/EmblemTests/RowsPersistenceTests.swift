@@ -8,6 +8,18 @@ private actor PersistenceHistoryTransport:GmailHTTPTransport {
     }
 }
 final class RowsPersistenceTests:XCTestCase {
+    func testBoundedArrayPreservesEmptyEscapedUnicodeBinaryAndOrdering()throws {
+        XCTAssertEqual(try RowsPersistence.encode([]),Data("[]".utf8))
+        var rows=[SenderRow(email:EmailAddress("first@fixture.test")!,name:"Line\nQuote\" 日本語 🦉"),SenderRow(email:EmailAddress("second@fixture.test")!,name:"Last")]
+        let c=AvatarCandidate(source:.manual,origin:"file:///fixture/photo.png",width:256,height:256,png:Data((0...255).map{UInt8($0)}))
+        rows[0].candidates=[c];rows[0].selectedCandidate=c.id;rows[0].selectionIsManual=true;rows[1].ignored=true
+        let bounded=try RowsPersistence.encode(rows),reference=try JSONEncoder().encode(rows)
+        let a=try JSONSerialization.jsonObject(with:bounded) as! NSArray,b=try JSONSerialization.jsonObject(with:reference) as! NSArray
+        XCTAssertEqual(a,b)
+        let reopened=try JSONDecoder().decode([SenderRow].self,from:bounded)
+        XCTAssertEqual(reopened.map(\.name),rows.map(\.name));XCTAssertEqual(reopened[0].chosen?.png,c.png)
+        XCTAssertTrue(reopened[0].selectionIsManual==true);XCTAssertTrue(reopened[1].ignored)
+    }
     func testBase64HeavyRowsRemainBackwardCompatibleWithoutSlashExpansion()throws {
         var row=SenderRow(email:EmailAddress("image@fixture.test")!,name:"Fixture")
         let candidate=AvatarCandidate(source:.touchIcon,origin:"https://fixture.test/icon.png",width:256,height:256,png:Data(repeating:255,count:32_000))

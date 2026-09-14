@@ -15,6 +15,11 @@ import PortraitCore
             Task {exit(await RowsPersistence.fixture())}
             RunLoop.main.run();exit(1)
         }
+        if args.contains("--rows-memory-fixture") {
+            guard NSApp == nil else {exit(1)}
+            Task {exit(await RowsPersistence.memoryFixture(arguments:args))}
+            RunLoop.main.run();exit(1)
+        }
         if args.contains("--headless-fixture") {
             do {
                 guard NSApp == nil else {exit(1)}

@@ -45,3 +45,17 @@ jobs:
           "$app/Contents/MacOS/Emblem" --self-test --data-dir "$RUNNER_TEMP/signed-fixtures" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
           EMBLEM_BINARY="$app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"
+      - name: Bounded large-photo codec preserves the original values
+        run: |
+          bin="$RUNNER_TEMP/signed-runtime/Emblem.app/Contents/MacOS/Emblem"
+          "$bin" --rows-memory-fixture --reference-codec --data-dir "$RUNNER_TEMP/reference-codec"
+          "$bin" --rows-memory-fixture --data-dir "$RUNNER_TEMP/bounded-codec"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])
+          a=json.loads((root/'reference-codec/encoded-fixture.json').read_text())
+          b=json.loads((root/'bounded-codec/encoded-fixture.json').read_text())
+          assert a==b and len(b)==1000
+          print('BOUNDED_CODEC_VALUES_AND_ORDER=PASS ROWS=1000 REAL_CONTACTS_WRITTEN=0')
+          PY
