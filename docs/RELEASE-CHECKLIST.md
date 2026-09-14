@@ -34,3 +34,5 @@
 - [ ] Tag, source archive, release notes, website links, and rollback artifact refer to the same version and hashes.
 
 Unchecked items are boundaries, not implicit claims. Source publication and binary distribution are separate gates.
+
+- [ ] Sent To/Cc discovers new contacts automatically; own aliases, Bcc-only and ignored addresses stay out; inbox recency and existing photo protections remain intact on Gmail and Apple Mail fallback.

@@ -21,6 +21,11 @@ struct AutomationPreferences: Codable {
     var fullMailRetryAfter: Date?
     var mailRetryChannels: Int?
     var contactsRetryAfter: Date?
+    var sentPosition: Int?
+    var sentBootstrapStarted: Date?
+    var lastSent: Date?
+    var lastSentSweep: Date?
+    var sentRetryAfter: Date?
 
     mutating func separateMailRetryChannels() {
         guard mailRetryChannels == nil else {return}
@@ -129,7 +134,7 @@ extension AppModel {
         automaticTick()
     }
     func stopAutomaticWork() {
-        gmailSyncTask?.cancel();gmailPushMaintenanceTask?.cancel(); automaticTask?.cancel(); discoveryTask?.cancel() }
+        gmailSyncTask?.cancel();gmailSentBootstrapTask?.cancel();gmailPushMaintenanceTask?.cancel(); automaticTask?.cancel(); discoveryTask?.cancel() }
     func refreshAutomaticWorking() { automaticWorking = automaticTask != nil || discoveryTask != nil }
     func pauseAutomatic() {
         automaticEnabled = false
@@ -220,6 +225,7 @@ extension AppModel {
                 automation.mailRoutingCatchup=true
                 automation.mailRetryAfter=nil;automation.fullMailRetryAfter=nil
                 automation.lastInboxSweep=nil;automation.lastFullMail=nil
+                automation.lastSent=nil;automation.lastSentSweep=nil;automation.sentPosition=nil;automation.sentBootstrapStarted=nil;automation.sentRetryAfter=nil
             }
             let missingDates=usesLiveMailScan && !rows.isEmpty && rows.allSatisfy{$0.lastInboxReceivedAt == nil}
             let inboxAvailable=(automation.mailRetryAfter ?? .distantPast)<=now
@@ -254,6 +260,13 @@ extension AppModel {
                 } catch is CancellationError {throw CancellationError()}
                 catch {deferMailRetry(source,now:now);saveAutomationPreferences();throw error}
             }
+        }
+        // Sent has its own paged import, delta cursor and retry. Failures here
+        // never consume the inbox retry channel or postpone incoming history.
+        if automation.mail && mailAutomationAvailable {
+            do {try await discoverSentMail(now:now,primary:MailProviderRouting.primaryEmails(gmail.accounts,now:now))}
+            catch is CancellationError {throw CancellationError()}
+            catch {automation.sentRetryAfter=now.addingTimeInterval(300);saveAutomationPreferences()}
         }
         if !mailSync.enabled {syncManagedAliases()}
     }

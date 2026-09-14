@@ -107,6 +107,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
     @Published var gmailConnecting = false
     @Published var gmailIssue: String?
     var gmailSyncTask: Task<Void,Never>?
+    var gmailSentBootstrapTask: Task<GmailBatch,Error>?
     var gmailSignInTask: Task<Void,Never>?
     var gmailPushMaintenanceTask: Task<Void,Never>?
     var gmailPushListenerTask: Task<Void,Never>?

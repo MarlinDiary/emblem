@@ -96,7 +96,7 @@ extension AppModel {
         let scheduledForced=gmailForcedAccountIDs
         let scheduled=Set(gmail.accounts.compactMap { account -> String? in
             guard (account.cursor.retryAfter ?? .distantPast)<=now else{return nil}
-            let paginating=account.cursor.pageToken != nil || account.cursor.historyPageToken != nil
+            let paginating=account.cursor.pageToken != nil || account.cursor.historyPageToken != nil || (account.cursor.sentBootstrapComplete != true && (account.cursor.sentRetryAfter ?? .distantPast)<=now)
             let interval=paginating ? 0.0:(account.pushIsHealthy(at:now) ? 900.0:60.0)
             return scheduledForced.contains(account.id) || now.timeIntervalSince(account.cursor.lastCheck ?? .distantPast)>=interval ? account.id:nil
         })
@@ -130,6 +130,33 @@ extension AppModel {
                         if !batch.hasMore {break}
                         if pageIndex == 2 && self.gmail.accounts.first(where:{$0.id==id})?.cursor.historyPageToken != nil {
                             self.gmailForcedAccountIDs.insert(id)
+                        }
+                    }
+                    // A legacy account imports Sent independently, after servicing
+                    // current history. A failed archive page never delays new inbox mail.
+                    if let account=self.gmail.accounts.first(where:{$0.id==id}),account.cursor.historyID != nil,
+                       account.cursor.sentBootstrapComplete != true,(account.cursor.sentRetryAfter ?? .distantPast)<=now {
+                        do {
+                            if let current=self.gmail.accounts.first(where:{$0.id==id}) {
+                                try Task.checkCancellation()
+                                let api=self.gmailAPI,cursor=current.cursor
+                                let archive=Task {try await withDeadline(seconds:45) {try await api.sentBatch(cursor:cursor,token:token)}}
+                                self.gmailSentBootstrapTask=archive
+                                defer {self.gmailSentBootstrapTask=nil}
+                                let batch=try await withTaskCancellationHandler {try await archive.value} onCancel:{archive.cancel()}
+                                try Task.checkCancellation()
+                                try await self.ingestGmail(batch,accountID:id)
+                                self.kickAutomaticLookup();self.kickMailSync()
+                            }
+                        } catch is CancellationError {
+                            if Task.isCancelled {throw CancellationError()}
+                            // A new-mail hint preempts only archive work, without
+                            // backoff. The deferred sync immediately replays history.
+                        } catch {
+                            if let i=self.gmail.accounts.firstIndex(where:{$0.id==id}) {
+                                self.gmail.accounts[i].cursor.sentRetryAfter=now.addingTimeInterval(300)
+                                try self.saveGmail()
+                            }
                         }
                     }
                 } catch is CancellationError {break}
@@ -201,6 +228,7 @@ extension AppModel {
 
     func noteGmailPush(accountID:String,historyID:String,receivedAt:Date=Date()) {
         guard gmail.accounts.contains(where:{$0.id==accountID}),GmailPushBackend.validHistory(historyID) else{return}
+        gmailSentBootstrapTask?.cancel()
         refreshGmailPushDelivery()
         if let i=gmail.accounts.firstIndex(where:{$0.id==accountID}) {gmail.accounts[i].push?.lastPush=receivedAt;gmail.accounts[i].pushIssue=nil;try? saveGmail()}
         kickGmailSync(now:Date(),forceAccountIDs:[accountID])
@@ -247,14 +275,14 @@ extension AppModel {
         let existingIDs=Set(rows.map(\.id))
         var receiptOnlyIDs=Set<String>(),addedSender=false
         for message in batch.messages {
-            guard let sender=message.sender,let date=message.received else{continue}
-            let addresses=EmailAddress.parseList(sender)
-            guard addresses.count==1,let email=addresses.first else{continue}
-            let revision=rowsRevision
-            ingestScanned(email:email,name:email.suggestedDisplayName(in:sender),seen:&seen,receivedAt:date)
-            if existingIDs.contains(email.value) {
-                if rowsRevision != revision {receiptOnlyIDs.insert(email.value)}
-            } else if rows.contains(where:{$0.id==email.value}) {addedSender=true}
+            let participants=MailParticipants.gmail(message,ownEmails:Set(gmail.accounts.map(\.email)))
+            for participant in participants {
+                let email=participant.email,revision=rowsRevision
+                ingestScanned(email:email,name:participant.name,seen:&seen,receivedAt:participant.inboxReceivedAt)
+                if existingIDs.contains(email.value) {
+                    if rowsRevision != revision {receiptOnlyIDs.insert(email.value)}
+                } else if rows.contains(where:{$0.id==email.value}) {addedSender=true}
+            }
         }
         scanReport=previousReport
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])

@@ -54,7 +54,7 @@ private actor PushEventFixture {
 final class GmailPushTests: XCTestCase {
     private let root = "/gmail/v1/users/me/"
 
-    func testWatchUsesInboxOnlyAndNeverLeaksTokenIntoURL() async throws {
+    func testWatchUsesInboxAndSentAndNeverLeaksTokenIntoURL() async throws {
         let transport = GmailPushTransportFixture([
             root + "watch": [(200, #"{"historyId":"901","expiration":"1789344000000"}"#)]
         ])
@@ -72,7 +72,7 @@ final class GmailPushTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(json["topicName"] as? String, "projects/fixture-project/topics/emblem-gmail-events")
-        XCTAssertEqual(json["labelIds"] as? [String], ["INBOX"])
+        XCTAssertEqual(json["labelIds"] as? [String], ["INBOX","SENT"])
         XCTAssertEqual(json["labelFilterBehavior"] as? String, "INCLUDE")
     }
 
@@ -175,7 +175,7 @@ final class GmailPushTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = fixtureModel(root: directory)
         let now = Date()
-        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now), push: healthyPush(now: now))]
+        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now, sentBootstrapComplete: true), push: healthyPush(now: now))]
         let transport = GmailPushTransportFixture([root + "history": [(200, #"{"historyId":"101"}"#)]])
         model.gmailAPI = GmailAPI(transport: transport)
         model.kickGmailSync(now: now.addingTimeInterval(61))
@@ -193,7 +193,7 @@ final class GmailPushTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = fixtureModel(root: directory), now = Date()
-        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now), push: healthyPush(now: now))]
+        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now, sentBootstrapComplete: true), push: healthyPush(now: now))]
         let transport = GmailPushTransportFixture([root + "history": [(200, #"{"historyId":"101"}"#), (429, "{}")]], delay: .milliseconds(20))
         model.gmailAPI = GmailAPI(transport: transport)
         model.noteGmailPush(accountID: "account", historyID: "101")
@@ -215,7 +215,7 @@ final class GmailPushTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = fixtureModel(root: directory), now = Date()
-        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now), push: healthyPush(now: now))]
+        model.gmail.accounts = [GmailAccount(id: "account", email: "fixture@gmail.com", cursor: .init(historyID: "100", lastCheck: now, sentBootstrapComplete: true), push: healthyPush(now: now))]
         let pages = (1...3).map { (200, "{\"historyId\":\"104\",\"nextPageToken\":\"p\($0)\"}") } + [(200, #"{"historyId":"104"}"#)]
         let transport = GmailPushTransportFixture([root + "history": pages])
         model.gmailAPI = GmailAPI(transport: transport)

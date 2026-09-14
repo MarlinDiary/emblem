@@ -62,7 +62,7 @@ final class V016GmailTests:XCTestCase {
         catch let error as GmailHTTPError {XCTAssertEqual(error.status,429)}
     }
     func testDeletedMessageIsNotAnErrorAndArchivedMessagesAreExcluded()async throws {
-        let transport=GmailTransportFixture([root+"history":[(200,#"{"historyId":"150","history":[{"messagesAdded":[{"message":{"id":"abc"}},{"message":{"id":"def"}}]}]}"#)],root+"messages/abc":[(404,"{}")],root+"messages/def":[(200,#"{"id":"def","labelIds":["SENT"]}"#)]])
+        let transport=GmailTransportFixture([root+"history":[(200,#"{"historyId":"150","history":[{"messagesAdded":[{"message":{"id":"abc"}},{"message":{"id":"def"}}]}]}"#)],root+"messages/abc":[(404,"{}")],root+"messages/def":[(200,#"{"id":"def","labelIds":["ARCHIVE"]}"#)]])
         let batch=try await GmailAPI(transport:transport).batch(cursor:GmailCursor(historyID:"100"),token:"fixture")
         XCTAssertTrue(batch.messages.isEmpty);XCTAssertEqual(batch.cursor.historyID,"150")
     }

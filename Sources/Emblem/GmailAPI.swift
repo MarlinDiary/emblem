@@ -8,6 +8,9 @@ struct GmailCursor: Codable, Equatable, Sendable {
     var historyPageToken: String?
     var lastCheck: Date?
     var retryAfter: Date?
+    var sentPageToken: String?
+    var sentBootstrapComplete: Bool?
+    var sentRetryAfter: Date?
 }
 struct GmailAccount: Codable, Identifiable, Equatable, Sendable {
     var id: String
@@ -91,7 +94,7 @@ struct GmailAPI: Sendable {
     func watch(token:String,topicName:String)async throws->GmailWatchResponse {
         guard topicName.range(of:#"^projects/[a-z][a-z0-9-]{4,29}/topics/[A-Za-z][A-Za-z0-9._~-]{2,254}$"#,options:.regularExpression) != nil else {throw PortraitError.message("Gmail watch configuration is invalid.")}
         struct Wire:Decodable {var historyId:String;var expiration:String}
-        let wire:Wire=try await post("watch",body:["topicName":topicName,"labelIds":["INBOX"],"labelFilterBehavior":"INCLUDE"],token:token)
+        let wire:Wire=try await post("watch",body:["topicName":topicName,"labelIds":["INBOX","SENT"],"labelFilterBehavior":"INCLUDE"],token:token)
         guard GmailPushBackend.validHistory(wire.expiration),let millis=Double(wire.expiration),millis.isFinite,millis>0,millis<253_402_300_800_000,GmailPushBackend.validHistory(wire.historyId) else {throw PortraitError.message("Gmail returned an invalid watch response.")}
         return GmailWatchResponse(historyId:wire.historyId,expiration:Date(timeIntervalSince1970:millis/1000))
     }
@@ -111,8 +114,8 @@ struct GmailAPI: Sendable {
             do {
                 let page:HistoryPage=try await get("history",query:query,token:token)
                 for entry in page.history ?? [] {
-                    ids += (entry.messagesAdded ?? []).filter { $0.message.labelIds?.contains("INBOX") != false }.map { $0.message.id }
-                    ids += (entry.labelsAdded ?? []).filter { $0.labelIds?.contains("INBOX") == true }.map { $0.message.id }
+                    ids += (entry.messagesAdded ?? []).filter { ($0.message.labelIds.map { !Set($0).isDisjoint(with:["INBOX","SENT"]) } ?? true) }.map { $0.message.id }
+                    ids += (entry.labelsAdded ?? []).filter { ($0.labelIds.map { !Set($0).isDisjoint(with:["INBOX","SENT"]) } ?? false) }.map { $0.message.id }
                 }
                 cursor.historyPageToken=page.nextPageToken;more=page.nextPageToken != nil
                 if !more {cursor.historyID=page.historyId}
@@ -135,6 +138,25 @@ struct GmailAPI: Sendable {
         cursor.lastCheck=now;cursor.retryAfter=nil
         return GmailBatch(messages:messages,cursor:cursor,hasMore:more)
     }
+    /// Independent one-time Sent import. Preserve the accepted inbox/history
+    /// cursor; history replay already covers sends racing this import.
+    func sentBatch(cursor initial:GmailCursor,token:String)async throws->GmailBatch {
+        var cursor=initial
+        guard cursor.sentBootstrapComplete != true else{return .init(messages:[],cursor:cursor,hasMore:false)}
+        var query=[URLQueryItem(name:"labelIds",value:"SENT"),.init(name:"maxResults",value:"100"),.init(name:"fields",value:"messages/id,nextPageToken")]
+        if let page=cursor.sentPageToken {query.append(.init(name:"pageToken",value:page))}
+        let page:Page
+        do {page=try await get("messages",query:query,token:token)}
+        catch let error as GmailHTTPError where error.status==400 && cursor.sentPageToken != nil {
+            cursor.sentPageToken=nil
+            return try await sentBatch(cursor:cursor,token:token)
+        }
+        let messages=try await metadata(ids:(page.messages ?? []).map(\.id),token:token)
+        cursor.sentPageToken=page.nextPageToken
+        cursor.sentBootstrapComplete=page.nextPageToken==nil
+        cursor.sentRetryAfter=nil
+        return .init(messages:messages.filter{$0.labelIds?.contains("SENT")==true},cursor:cursor,hasMore:page.nextPageToken != nil)
+    }
     private func metadata(ids:[String],token:String)async throws->[GmailMessage] {
         try await withThrowingTaskGroup(of:GmailMessage?.self) { group in
             var next=0;var results:[GmailMessage]=[]
@@ -142,8 +164,9 @@ struct GmailAPI: Sendable {
                 group.addTask {
                     guard !id.isEmpty,id.allSatisfy({$0.isHexDigit}) else {throw PortraitError.message("Gmail returned an invalid message identifier.")}
                     do {
-                        let message:GmailMessage=try await get("messages/"+id,query:[.init(name:"format",value:"metadata"),.init(name:"metadataHeaders",value:"From"),.init(name:"fields",value:"id,labelIds,internalDate,payload/headers")],token:token)
-                        return message.labelIds?.contains("INBOX") == true ? message:nil
+                        let message:GmailMessage=try await get("messages/"+id,query:[.init(name:"format",value:"metadata"),.init(name:"metadataHeaders",value:"From"),.init(name:"metadataHeaders",value:"To"),.init(name:"metadataHeaders",value:"Cc"),.init(name:"fields",value:"id,labelIds,internalDate,payload/headers")],token:token)
+                        let labels=Set(message.labelIds ?? [])
+                        return !labels.isDisjoint(with:["INBOX","SENT"]) && labels.isDisjoint(with:["SPAM","TRASH"]) ? message:nil
                     } catch let e as GmailHTTPError where e.status==404 {return nil}
                 }
             }

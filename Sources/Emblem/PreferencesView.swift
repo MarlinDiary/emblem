@@ -55,7 +55,7 @@ struct PreferencesView: View {
                     }
                 }
                 Section("On This Mac") {
-                    Text("No analytics or hosted address book. Gmail reads sender headers, dates and inbox metadata—not bodies, subjects or attachments. Credentials stay in Keychain.").font(.caption).foregroundStyle(.secondary)
+                    Text("No analytics or hosted address book. Gmail reads From, To and Cc headers, dates and inbox/sent metadata—not bodies, subjects or attachments. Credentials stay in Keychain.").font(.caption).foregroundStyle(.secondary)
                     if GmailPushConfiguration.current() != nil {
                         Text("Instant updates use an Emblem relay on Cloudflare. Registration verifies your Google email; notifications contain your account email and a history identifier. The relay keeps only a keyed account identifier and expiring device credentials—not mailbox content or Gmail tokens.").font(.caption).foregroundStyle(.secondary)
                     }

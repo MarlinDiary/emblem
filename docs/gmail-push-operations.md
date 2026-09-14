@@ -4,7 +4,7 @@ This feature is on the development branch. The tagged 0.19.0 release still uses 
 
 ## Data flow
 
-Gmail `users.watch` (INBOX only) → Pub/Sub authenticated HTTPS Push → Cloudflare Worker → per-account SQLite Durable Object with hibernatable WebSockets → Emblem's macOS-managed background helper → the process holding the library lease → `history.list` → existing avatar lookup and journaled Contacts sync.
+Gmail `users.watch` (INBOX and SENT) → Pub/Sub authenticated HTTPS Push → Cloudflare Worker → per-account SQLite Durable Object with hibernatable WebSockets → Emblem's macOS-managed background helper → the process holding the library lease → `history.list` → inbox senders and To/Cc sent recipients → existing avatar lookup and journaled Contacts sync.
 
 The foreground app exits on Command-Q. The helper is a separate `SMAppService` login item: it starts at login, stays connected while at least one mailbox has a valid Push registration, and yields library writes to the visible app. Without a Push-ready account it keeps the existing bounded, approximately one-minute job. macOS approval in Login Items remains required when the OS requests it.
 
@@ -77,3 +77,12 @@ All four values are required together. Do not put tokens, client JSON or service
 Rollback a release using the preserved signed stable app and its verified backup. A client rollback leaves discovered rows and Contacts intact; journal-based undo is separate. To stop cloud delivery, delete only `emblem-gmail-push` and the named relay when no Macs need them. Do not broadly reset project IAM or rotate HMAC as a rollback shortcut.
 
 Sources: [Gmail Push](https://developers.google.com/workspace/gmail/api/guides/push), [users.watch](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users/watch), [authenticated Pub/Sub](https://docs.cloud.google.com/pubsub/docs/authenticate-push-subscriptions), [WebSocket hibernation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).
+
+## Outgoing-recipient acceptance
+
+- Send to a new address and CC a second one; both appear once and resolve automatically when discovery/avatar/Contacts sync are enabled.
+- Include your account/send-as address and a Bcc-only address; neither is enrolled by outgoing discovery.
+- A sent recipient with a previous inbox receipt keeps that receipt time and list position. Existing manual choices and externally edited Contacts remain protected.
+- A legacy Gmail account imports Sent with its own page token, preserving the saved history and inbox pagination. An archive failure uses a separate five-minute retry and incoming history continues. A new-mail hint cancels a slow Sent backfill request without advancing its page token or adding retry delay; one archive page is serviced per pass.
+- Apple Mail uses its documented top-level Sent mailbox, not localized folder-name guesses. The first/daily sweep is resumable in 200-message pages; recent checks overlap five minutes and fall back to paging after a large catch-up. The local library is persisted before each outgoing cursor advances.
+- Verify these on the configured installed bundle with real sent mail before marking the release complete; transport/fixture tests do not establish live-mail latency or Contacts acceptance.

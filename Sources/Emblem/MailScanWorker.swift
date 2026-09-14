@@ -58,7 +58,7 @@ actor MailScanScriptRunner {
             let value:ScriptValue
             if request.handler == "fixture" {value = .list(request.arguments)}
             else {
-                guard ["scaninventory","scanpageat","scanrecent","scanroutedinventory","scanroutedrecent","scanaccounts"].contains(request.handler) else{throw PortraitError.message("Unknown Mail scan operation.")}
+                guard ["scaninventory","scanpageat","scanrecent","scanroutedinventory","scanroutedrecent","scanaccounts","scansentpage","scanrecentsent"].contains(request.handler) else{throw PortraitError.message("Unknown Mail scan operation.")}
                 value=try execute(request.handler,arguments:request.arguments)
             }
             response=MailScriptResponse(value:value,error:nil,mainThread:Thread.isMainThread)
