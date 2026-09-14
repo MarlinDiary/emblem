@@ -70,7 +70,8 @@ final class V016GmailTests:XCTestCase {
         let client=GmailOAuthClient(clientID:"test.apps.googleusercontent.com")
         let a=GmailAuthorization.request(client:client,redirect:URL(string:"http://127.0.0.1:41001")!)
         let b=GmailAuthorization.request(client:client,redirect:URL(string:"http://127.0.0.1:41001")!)
-        XCTAssertEqual(a.scope,GmailAPI.scope);XCTAssertEqual(a.codeChallengeMethod,"S256")
+        let scopes=Set((a.scope ?? "").split(separator:" ").map(String.init))
+        XCTAssertTrue(Set(GmailAuthorization.identityScopes).isSubset(of:scopes));XCTAssertEqual(a.codeChallengeMethod,"S256")
         XCTAssertNotNil(a.codeVerifier);XCTAssertNotEqual(a.state,b.state)
         XCTAssertEqual(a.configuration.tokenEndpoint.absoluteString,"https://oauth2.googleapis.com/token")
     }

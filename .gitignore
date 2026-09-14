@@ -4,7 +4,15 @@
 build/
 DerivedData/
 .DS_Store
+Push/node_modules/
+Push/.dev.vars
+Push/.wrangler/
+Push/.wrangler-dry/
 *.xcuserstate
+__pycache__/
+*.pyc
+gmail-push-inbox.json
+gmail-push-inbox.lock
 *.app
 *.dmg
 *.pkg

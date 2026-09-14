@@ -10,7 +10,8 @@ enum MailProviderRouting {
                   account.cursor.historyID != nil,account.cursor.bootstrapHistoryID == nil,
                   account.cursor.pageToken == nil,account.cursor.historyPageToken == nil,
                   let checked=account.cursor.lastCheck,
-                  now.timeIntervalSince(checked) >= -60,now.timeIntervalSince(checked) <= 180,
+                  now.timeIntervalSince(checked) >= -60,
+                  (now.timeIntervalSince(checked) <= 180 || (account.pushIsHealthy(at:now) && now.timeIntervalSince(checked)<=1_800)),
                   let email=EmailAddress(account.email) else {return nil}
             return email.value.lowercased()
         })

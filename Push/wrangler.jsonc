@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "emblem-push",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "observability": { "enabled": false },
+  "ratelimits": [{ "name": "REGISTRATION_LIMIT", "namespace_id": "101", "simple": { "limit": 20, "period": 60 } }],
+  "durable_objects": {
+    "bindings": [{ "name": "ACCOUNT_CHANNEL", "class_name": "AccountChannel" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountChannel"] }],
+  "routes": [{ "pattern": "push.emblem.protoyard.com", "custom_domain": true }]
+}

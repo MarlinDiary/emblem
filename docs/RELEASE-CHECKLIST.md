@@ -6,6 +6,7 @@
 - [ ] `swift test` passes with no unexpected skip or network dependency.
 - [ ] Source/archive scan finds no OAuth JSON, secrets, tokens, real Emblem library, personal diagnostics, contact images, or signing material.
 - [ ] Dependency licenses and privacy descriptions are present.
+- [ ] For Push builds: Worker tests, operations tests and dry deploy pass; public configuration matches the desktop OAuth project.
 
 ## Isolated behavior
 
@@ -24,6 +25,7 @@
 - [ ] A no-change background pass skips the linked-card full read and large sender-library rewrite.
 - [ ] Disposable Contacts: create/update, read-back in Contacts, Mail appearance, restart, external edit, ignore, and undo/delete protection are observed separately.
 - [ ] Minimum supported macOS and each shipped architecture are tested.
+- [ ] For Push builds: real new-mail latency, persistent helper after Command-Q, watch renewal, foreground handoff, reconnect/wake catch-up and dropped-notification fallback are independently observed.
 
 ## Distribution
 

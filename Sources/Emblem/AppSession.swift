@@ -17,6 +17,7 @@ import Combine
     let size: CGSize
     private var timer: AnyCancellable?
     private var observers = Set<AnyCancellable>()
+    private var pushObserver:NSObjectProtocol?
     private let initialDemo: Bool
     private let rootOverride: URL?
     private let isolatedRoot: URL?
@@ -44,6 +45,9 @@ import Combine
         NotificationCenter.default.publisher(for:.CNContactStoreDidChange).sink { [weak self] _ in
             Task { @MainActor in guard let self,self.isReady else{return};self.model.contactsDidChange() }
         }.store(in:&observers)
+        pushObserver=DistributedNotificationCenter.default().addObserver(forName:GmailPushSignal.notification,object:nil,queue:.main) { [weak self] _ in
+            Task { @MainActor in guard let self,self.isReady else{return};self.model.consumeGmailPushInbox() }
+        }
         if liveForeground {startupTask=Task {await openLiveLibrary()}}
     }
     private func openLiveLibrary()async {
@@ -61,13 +65,12 @@ import Combine
                 try await Task.sleep(for:.milliseconds(100))
             }
             model=AppModel(demo:false,rootOverride:root)
-            model.backgroundPreferenceChanged={ [weak self] in
-                guard let self else{return}
-                Task {await BackgroundService.update(for:self.model)}
-            }
+            installBackgroundReconciliation()
             if let placeholderRoot {try? FileManager.default.removeItem(at:placeholderRoot);self.placeholderRoot=nil}
             isReady=true
             await BackgroundService.update(for:model)
+            model.consumeGmailPushInbox()
+            model.refreshForegroundGmailPushListener(backgroundServiceActive:model.mailSync.background && BackgroundService.service.status == .enabled)
             if model.mailSync.enabled && CNContactStore.authorizationStatus(for: .contacts) == .notDetermined {
                 // A renamed app can be re-evaluated by TCC even when its stable
                 // compatibility identity is unchanged. Ask once from the visible
@@ -78,12 +81,21 @@ import Combine
     }
     func switchMode(demo: Bool) {
         guard !model.busy, !model.isScanning, model.discoveryTask == nil, model.demo != demo else { return }
-        model.stopAutomaticWork();model.syncTask?.cancel()
+        model.stopAutomaticWork();model.stopGmailPushListening();model.syncTask?.cancel()
         model = AppModel(demo: demo, rootOverride: isolatedRoot?.appendingPathComponent(demo ? "demo" : "main") ?? (demo == initialDemo ? rootOverride : nil))
         if demo && model.rows.isEmpty { model.loadDemo() }
         if liveForeground && !demo {
-            model.backgroundPreferenceChanged={ [weak self] in guard let self else{return};Task {await BackgroundService.update(for:self.model)} }
+            installBackgroundReconciliation()
             Task {await BackgroundService.update(for:model)}
+        }
+    }
+    private func installBackgroundReconciliation() {
+        model.backgroundPreferenceChanged={ [weak self] in
+            guard let self else{return}
+            Task { @MainActor in
+                await BackgroundService.update(for:self.model)
+                self.model.refreshForegroundGmailPushListener(backgroundServiceActive:self.model.mailSync.background && BackgroundService.service.status == .enabled)
+            }
         }
     }
 }

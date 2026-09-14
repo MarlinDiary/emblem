@@ -55,6 +55,10 @@ All discovery fetches use public HTTPS on port 443. Credential-bearing URLs, loo
 
 Application data lives in `~/Library/Application Support/Emblem/`; Gmail credentials and OAuth client configuration live in Keychain. The foreground app and the `SMAppService` background job acquire the same non-blocking `flock` lease. A foreground request asks a running bounded job to cancel, await its tasks, checkpoint, and release the lease before the GUI opens the live library.
 
+## Push development
+
+The optional `Push/` relay receives authenticated Gmail Pub/Sub hints and routes them to hibernatable per-account WebSockets. The launchd helper keeps sockets independently of the foreground writer lease. A durable, separately locked hint inbox and distributed signal wake the library owner. Notifications never advance a Gmail cursor; the normal persisted history ingestion and Contacts journal remain authoritative. Daily watch renewal, device expiry alarms, reconnect catch-up and safety polling preserve recovery. See [operations](gmail-push-operations.md) for deployment, privacy and acceptance boundaries.
+
 ## Recovery boundary
 
 Prepared journal records are never guessed away. Re-running sync cannot duplicate an unresolved mutation. Undo restores a previous photo or removes only an unchanged app-created contact. External contact edits, missing history, and inconsistent read-back stop destructive cleanup and retain evidence for review.

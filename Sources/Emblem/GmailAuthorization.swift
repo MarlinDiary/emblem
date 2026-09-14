@@ -16,6 +16,10 @@ struct GmailOAuthClient: Codable, Equatable {
         return Self(clientID:client.client_id,clientSecret:client.client_secret)
     }
 }
+struct GmailOAuthTokens: Sendable {
+    var accessToken:String
+    var idToken:String?
+}
 /// Secrets stay in this Mac's Keychain, not the JSON library, diagnostics or URLs.
 enum GmailKeychain {
     static let service="com.protoyard.emblem.gmail"
@@ -52,6 +56,7 @@ enum GmailKeychain {
     private var timeout:Task<Void,Never>?
     private var states:[String:OIDAuthState]=[:]
     static let clientKey="desktop-client"
+    static let identityScopes=["openid","email",GmailAPI.scope]
     init() {
         let configuration=URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest=15;configuration.timeoutIntervalForResource=20
@@ -66,7 +71,7 @@ enum GmailKeychain {
     func importClient(_ data:Data)throws {try GmailKeychain.save(JSONEncoder().encode(GmailOAuthClient.parse(data)),account:Self.clientKey)}
     static func request(client:GmailOAuthClient,redirect:URL)->OIDAuthorizationRequest {
         let configuration=OIDServiceConfiguration(authorizationEndpoint:URL(string:"https://accounts.google.com/o/oauth2/v2/auth")!,tokenEndpoint:URL(string:"https://oauth2.googleapis.com/token")!)
-        return OIDAuthorizationRequest(configuration:configuration,clientId:client.clientID,clientSecret:client.clientSecret,scopes:[GmailAPI.scope],redirectURL:redirect,responseType:OIDResponseTypeCode,additionalParameters:["access_type":"offline","prompt":"consent select_account"])
+        return OIDAuthorizationRequest(configuration:configuration,clientId:client.clientID,clientSecret:client.clientSecret,scopes:identityScopes,redirectURL:redirect,responseType:OIDResponseTypeCode,additionalParameters:["access_type":"offline","prompt":"consent select_account"])
     }
     func authorize(client:GmailOAuthClient)async throws->OIDAuthState {
         guard handler==nil else{throw PortraitError.message("A Gmail sign-in is already open.")}
@@ -83,7 +88,8 @@ enum GmailKeychain {
             try await withCheckedThrowingContinuation { continuation in
                 listener.currentAuthorizationFlow=OIDAuthState.authState(byPresenting:Self.request(client:client,redirect:redirect),presenting:presentingWindow) { state,error in
                     Task { @MainActor in
-                        if let state,state.isAuthorized,Set((state.scope ?? "").split(separator:" ").map(String.init)).contains(GmailAPI.scope) {
+                        let granted=Set((state?.scope ?? "").split(separator:" ").map(String.init))
+                        if let state,state.isAuthorized,Set(Self.identityScopes).isSubset(of:granted) {
                             continuation.resume(returning:state)
                         } else if (error as NSError?)?.code == OIDErrorCode.userCanceledAuthorizationFlow.rawValue {
                             continuation.resume(throwing:CancellationError())
@@ -99,26 +105,34 @@ enum GmailKeychain {
         try GmailKeychain.save(data,account:accountID);states[accountID]=state
     }
     func token(accountID:String)async throws->String {
-        let state:OIDAuthState
-        if let existing=states[accountID] {state=existing}
-        else {
-            guard let data=try GmailKeychain.read(accountID),let stored=try NSKeyedUnarchiver.unarchivedObject(ofClass:OIDAuthState.self,from:data) else {throw GmailHTTPError(status:401)}
-            state=stored;states[accountID]=stored
-        }
-        let token=try await Self.freshToken(state)
+        let pair=try await tokens(accountID:accountID)
+        return pair.accessToken
+    }
+    func tokens(accountID:String,forceRefresh:Bool=false)async throws->GmailOAuthTokens {
+        let state=try loadState(accountID:accountID)
+        let pair=try await Self.freshTokens(state,forceRefresh:forceRefresh)
         try Task.checkCancellation()
         try save(state,accountID:accountID)
-        return token
+        return pair
+    }
+    private func loadState(accountID:String)throws->OIDAuthState {
+        if let existing=states[accountID] {return existing}
+        guard let data=try GmailKeychain.read(accountID),let stored=try NSKeyedUnarchiver.unarchivedObject(ofClass:OIDAuthState.self,from:data) else {throw GmailHTTPError(status:401)}
+        states[accountID]=stored;return stored
     }
     static func freshToken(_ state:OIDAuthState)async throws->String {
-        try await withCheckedThrowingContinuation { continuation in
-            state.performAction { token,_,error in
+        try await freshTokens(state).accessToken
+    }
+    static func freshTokens(_ state:OIDAuthState,forceRefresh:Bool=false)async throws->GmailOAuthTokens {
+        if forceRefresh {state.setNeedsTokenRefresh()}
+        return try await withCheckedThrowingContinuation { (continuation:CheckedContinuation<GmailOAuthTokens,Error>) in
+            state.performAction { token,idToken,error in
                 if error != nil {continuation.resume(throwing:GmailHTTPError(status:401))}
-                else if let token {continuation.resume(returning:token)}
+                else if let token {continuation.resume(returning:GmailOAuthTokens(accessToken:token,idToken:idToken))}
                 else {continuation.resume(throwing:GmailHTTPError(status:401))}
             }
         }
     }
-    func forget(accountID:String)throws {try GmailKeychain.delete(accountID);states.removeValue(forKey:accountID)}
+    func forget(accountID:String)throws {try GmailKeychain.delete(accountID);try GmailPushCredentials.delete(accountID:accountID);states.removeValue(forKey:accountID)}
     func cancel(){handler?.currentAuthorizationFlow?.cancel()}
 }

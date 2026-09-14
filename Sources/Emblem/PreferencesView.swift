@@ -12,19 +12,27 @@ struct PreferencesView: View {
                     Toggle("Use Apple Mail as needed",isOn:$model.automation.mail)
                     ForEach(model.gmail.accounts) { account in
                         LabeledContent {
-                            Button("Disconnect") {disconnectID=account.id}.controlSize(.small)
+                            HStack {
+                                if GmailPushConfiguration.current() != nil && account.push == nil {
+                                    Button("Reconnect") {model.connectGmail()}.disabled(model.gmailConnecting || model.demo)
+                                }
+                                Button("Disconnect") {disconnectID=account.id}
+                            }.controlSize(.small)
                         } label: {
                             VStack(alignment:.leading,spacing:3) {
                                 Text(account.email).lineLimit(1)
                                 if let issue=account.issue {Text(issue).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)}
-                                else {Text("Gmail · Connected").font(.caption).foregroundStyle(.secondary)}
+                                else if let issue=account.pushIssue {Text(issue).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)}
+                                else {Text(account.pushIsHealthy(at:Date()) ? "Gmail · Instant updates" : "Gmail · Connected").font(.caption).foregroundStyle(.secondary)}
                             }
                         }
                     }
                     if model.gmailConnecting {
                         HStack {Text("Finish signing in with Google").foregroundStyle(.secondary);Spacer();Button("Cancel") {model.gmailAuthorization.cancel();model.gmailSignInTask?.cancel()}}
                     } else {Button("Connect Gmail…") {model.connectGmail()}.disabled(model.demo)}
-                    Text("Connected Gmail accounts are checked directly. Apple Mail covers other accounts and takes over if Gmail needs to retry.").font(.caption).foregroundStyle(.secondary)
+                    Text(GmailPushConfiguration.current() == nil
+                         ? "Connected Gmail accounts are checked directly. Apple Mail covers other accounts and takes over if Gmail needs to retry."
+                         : "Instant updates route your account email and history hints through Emblem’s relay on Cloudflare. Gmail access tokens and mail content are never sent to the relay. Apple Mail remains the fallback.").font(.caption).foregroundStyle(.secondary)
                     if let issue=model.gmailIssue {Text(issue).font(.caption).foregroundStyle(.orange)}
                 }
                 Section("Sync") {
@@ -47,7 +55,10 @@ struct PreferencesView: View {
                     }
                 }
                 Section("On This Mac") {
-                    Text("No analytics or project-hosted address book. Gmail requests sender headers, dates and inbox metadata—not message bodies, subjects or attachments. Credentials stay in Keychain.").font(.caption).foregroundStyle(.secondary)
+                    Text("No analytics or hosted address book. Gmail reads sender headers, dates and inbox metadata—not bodies, subjects or attachments. Credentials stay in Keychain.").font(.caption).foregroundStyle(.secondary)
+                    if GmailPushConfiguration.current() != nil {
+                        Text("Instant updates use an Emblem relay on Cloudflare. Registration verifies your Google email; notifications contain your account email and a history identifier. The relay keeps only a keyed account identifier and expiring device credentials—not mailbox content or Gmail tokens.").font(.caption).foregroundStyle(.secondary)
+                    }
                     HStack {Button("Show Data Folder") {NSWorkspace.shared.open(model.root)};Spacer();Button("Undo Changes…") {model.showHistoryTools=true}}
                     Text("Ignoring a sender stops sync and reverses this app’s changes when possible. Your original contacts and externally edited cards are preserved.").font(.caption).foregroundStyle(.secondary)
                 }
@@ -81,7 +92,7 @@ struct HelpView:View {
                 Text("Emblem Help").font(.largeTitle.weight(.bold))
                 help("Connect an account", "Use Apple Mail, or connect Gmail directly in Settings. Google sign-in is completed in your browser. Contacts access is requested by macOS.")
                 help("Choose a photo", "Click a photo to use it. With automatic sync enabled, the change appears in Contacts without another Apply step. Existing personal photos and your manual choices are preserved.")
-                help("Keep it automatic", "Enable Continue after quitting to let macOS check for new senders after Cmd-Q. Checks are approximately once a minute, with retries when needed. This is not instant push; sleep and logout pause work.")
+                help("Keep it automatic", "Enable Continue after quitting to let macOS check for new senders after Cmd-Q. Gmail instant updates reconnect automatically and renew in the background. Regular checks recover missed notifications; Apple Mail remains the fallback. Sleep, offline periods and logout pause delivery until the Mac reconnects.")
                 help("Ignore or undo", "Ignore stops maintaining a sender and reverses this app’s changes when possible. Only unmodified cards created by this app are deleted. Use View → Show Ignored Senders to restore them, or Settings → Privacy → Undo Changes for history.")
                 Text("Photos help you recognize senders. They do not verify identity. Emblem is independent of Apple.").font(.caption).foregroundStyle(.secondary)
             }.padding(28)

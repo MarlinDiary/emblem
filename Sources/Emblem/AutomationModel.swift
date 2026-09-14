@@ -129,7 +129,7 @@ extension AppModel {
         automaticTick()
     }
     func stopAutomaticWork() {
-        gmailSyncTask?.cancel(); automaticTask?.cancel(); discoveryTask?.cancel() }
+        gmailSyncTask?.cancel();gmailPushMaintenanceTask?.cancel(); automaticTask?.cancel(); discoveryTask?.cancel() }
     func refreshAutomaticWorking() { automaticWorking = automaticTask != nil || discoveryTask != nil }
     func pauseAutomatic() {
         automaticEnabled = false
@@ -141,6 +141,8 @@ extension AppModel {
         !showImport && !showScan && undoRecord == nil
     }
     func automaticTick(now: Date = Date()) {
+        consumeGmailPushInbox()
+        kickGmailPushMaintenance(now:now)
         kickGmailSync(now:now)
         kickMailSync()
         guard automaticMayRun else { return }

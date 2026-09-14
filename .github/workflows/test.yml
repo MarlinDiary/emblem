@@ -13,9 +13,26 @@ jobs:
           xcodebuild -version
           test "$(xcrun --sdk macosx --show-sdk-version | cut -d. -f1)" -ge 26
       - run: swift test
+      - run: python3 -m unittest discover -s Tests/Operations -v
       - run: bash Scripts/build-app.sh
       - name: Isolated lifecycle and rollback
         run: |
           build/Emblem.app/Contents/MacOS/Emblem --self-test --data-dir "$RUNNER_TEMP/emblem-fixtures" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
           EMBLEM_BINARY="$PWD/build/Emblem.app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"
+  push-relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Push
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Push/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run deploy:dry

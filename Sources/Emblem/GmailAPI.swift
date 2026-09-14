@@ -14,6 +14,9 @@ struct GmailAccount: Codable, Identifiable, Equatable, Sendable {
     var email: String
     var cursor = GmailCursor()
     var issue: String?
+    var push: GmailPushState?
+    var pushIssue: String?
+    var pushRetryAfter: Date?
 }
 struct GmailConnections: Codable, Sendable { var accounts: [GmailAccount] = [] }
 struct GmailHeader: Codable, Sendable { var name: String; var value: String }
@@ -27,6 +30,10 @@ struct GmailMessage: Decodable, Sendable {
     var received: Date? { internalDate.flatMap(Double.init).map { Date(timeIntervalSince1970: $0 / 1000) } }
 }
 struct GmailProfile: Decodable, Sendable { var emailAddress: String; var historyId: String }
+struct GmailWatchResponse: Sendable {
+    var historyId: String
+    var expiration: Date
+}
 struct GmailBatch: Sendable { var messages: [GmailMessage]; var cursor: GmailCursor; var hasMore: Bool }
 struct GmailHTTPError: Error, LocalizedError, Sendable {
     var status: Int
@@ -67,8 +74,26 @@ struct GmailAPI: Sendable {
         guard response.statusCode==200 else {throw GmailHTTPError(status:response.statusCode)}
         return try JSONDecoder().decode(T.self,from:data)
     }
+    private func post<T:Decodable>(_ path:String,body:[String:Any],token:String)async throws->T {
+        let url=URL(string:"https://gmail.googleapis.com/gmail/v1/users/me/"+path)!
+        var request=URLRequest(url:url);request.httpMethod="POST"
+        request.setValue("Bearer "+token,forHTTPHeaderField:"Authorization")
+        request.setValue("application/json",forHTTPHeaderField:"Accept")
+        request.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        request.httpBody=try JSONSerialization.data(withJSONObject:body)
+        let (data,response)=try await transport.data(for:request)
+        guard response.statusCode==200 else {throw GmailHTTPError(status:response.statusCode)}
+        return try JSONDecoder().decode(T.self,from:data)
+    }
     func profile(token:String)async throws->GmailProfile {
         try await get("profile",query:[.init(name:"fields",value:"emailAddress,historyId")],token:token)
+    }
+    func watch(token:String,topicName:String)async throws->GmailWatchResponse {
+        guard topicName.range(of:#"^projects/[a-z][a-z0-9-]{4,29}/topics/[A-Za-z][A-Za-z0-9._~-]{2,254}$"#,options:.regularExpression) != nil else {throw PortraitError.message("Gmail watch configuration is invalid.")}
+        struct Wire:Decodable {var historyId:String;var expiration:String}
+        let wire:Wire=try await post("watch",body:["topicName":topicName,"labelIds":["INBOX"],"labelFilterBehavior":"INCLUDE"],token:token)
+        guard GmailPushBackend.validHistory(wire.expiration),let millis=Double(wire.expiration),millis.isFinite,millis>0,millis<253_402_300_800_000,GmailPushBackend.validHistory(wire.historyId) else {throw PortraitError.message("Gmail returned an invalid watch response.")}
+        return GmailWatchResponse(historyId:wire.historyId,expiration:Date(timeIntervalSince1970:millis/1000))
     }
     private struct Page:Decodable {struct ID:Decodable {var id:String}; var messages:[ID]?;var nextPageToken:String?}
     private struct HistoryPage:Decodable {

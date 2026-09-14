@@ -108,6 +108,9 @@ struct SenderRow: Identifiable, Codable, Sendable {
     @Published var gmailIssue: String?
     var gmailSyncTask: Task<Void,Never>?
     var gmailSignInTask: Task<Void,Never>?
+    var gmailPushMaintenanceTask: Task<Void,Never>?
+    var gmailPushListenerTask: Task<Void,Never>?
+    var gmailForcedAccountIDs=Set<String>()
     lazy var gmailAuthorization = GmailAuthorization()
     var gmailAPI = GmailAPI()
     var gmailTokenProvider: ((String) async throws -> String)?

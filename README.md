@@ -43,7 +43,7 @@ Automatic Contacts sync is opt-in. Once enabled, new eligible senders and select
 
 ### Background operation
 
-**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. It runs approximately once a minute while the user is logged in and the Mac is awake. It is polling, not push.
+**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. It runs approximately once a minute while the user is logged in and the Mac is awake. The tagged 0.19.0 release uses polling. The development branch adds Gmail instant updates; see [Push operations and acceptance](docs/gmail-push-operations.md).
 
 The foreground app and background job share an exclusive library lease, so they do not write the local library or Contacts concurrently.
 
@@ -97,6 +97,10 @@ EMBLEM_GOOGLE_CLIENT_ID='YOUR_CLIENT_ID.apps.googleusercontent.com' \
 ```
 
 A broadly distributed OAuth client must satisfy Google's consent-screen and restricted-scope requirements. Testing-mode grants may have shorter lifetimes.
+
+## Gmail Push development
+
+`Push/` contains the optional Cloudflare relay, with RSA-verified Google registration and authenticated Pub/Sub delivery. The Mac receives hints over a persistent, OS-managed background WebSocket, replays its saved Gmail history cursor and renews the watch automatically. This needs deployment in the desktop client's Google Cloud project plus real-mail acceptance before a release. [Setup, timing, privacy and rollback](docs/gmail-push-operations.md).
 
 ## Privacy and security
 
