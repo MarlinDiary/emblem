@@ -1,0 +1,39 @@
+{
+  "features": [
+    "refractivity"
+  ],
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.04000,0.44000,0.97000,1.00000"
+  },
+  "groups": [
+    {
+      "blur-material": 0.0,
+      "layers": [
+        {
+          "image-name": "Emblem.svg",
+          "name": "Portrait and ring"
+        }
+      ],
+      "refractivity": {
+        "enabled": true,
+        "depth": 0.05,
+        "strength": 0.16
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.25
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.1
+      },
+      "name": "Emblem"
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

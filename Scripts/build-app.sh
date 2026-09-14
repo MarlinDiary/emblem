@@ -69,10 +69,7 @@ cp "$ROOT/Resources/LaunchAgents/com.protoyard.emblem.sync.plist" "$APP/Contents
 cp "$ROOT/Resources/LaunchAgents/org.mailportrait.sync.plist" "$APP/Contents/Library/LaunchAgents/"
 plutil -insert DTSDKName -string "macosx$SDK_VERSION" "$APP/Contents/Info.plist"
 plutil -insert DTPlatformVersion -string "$SDK_VERSION" "$APP/Contents/Info.plist"
-ICONSET="$(mktemp -d)/AppIcon.iconset"
-mkdir -p "$ICONSET"
-swift "$ROOT/Scripts/make-icon.swift" "$ICONSET"
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+bash "$ROOT/Scripts/build-icon.sh" "$APP"
 SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 if [[ -z "$SIGN_IDENTITY" ]]; then
   # A stable identity preserves the designated requirement across local builds.

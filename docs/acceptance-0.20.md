@@ -105,3 +105,20 @@ or account requests were made by these codec probes. Final signed release
 measurements and runtime CI have separate records. A short codec benchmark does
 not substitute for the fresh build53 natural72-hour resident cohort; the
 original build52 observations and peaks are retained.
+
+## Build54 native icon
+
+The portrait and ring now share one compound vector path and one foreground
+material group. The glass disk is removed; the cutout exposes the background.
+Icon Composer exported Default, Dark and Mono at 1024px for design generations
+26 and 27; these and small-size/compatible output were reviewed. The resource
+regression first failed on the previous three-layer source, then passed with
+the same inputs after the change. `actool` produces native `Assets.car` image
+stacks and a compatible ICNS. Runtime application sources are unchanged from
+build53; prior mail timings are not relabelled as measurements of build54.
+
+RC4 is a preview, not stable promotion. Exact signed archive, installation,
+registered helper and runtime-matrix checks are recorded independently. Preserve
+build53's complete observations before replacing the installed bundle; build54
+has a separate natural observation cohort, not a continuation or reset of the
+previous cohort's elapsed-time claim.

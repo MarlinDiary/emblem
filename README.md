@@ -9,7 +9,7 @@ Emblem is a local-first macOS companion for sender avatars in Apple Mail. It dis
 
 Download: [Emblem 0.19.0 for macOS](https://github.com/MarlinDiary/emblem/releases/download/v0.19.0/Emblem-0.19.0-macOS.zip) · Website: [emblem.protoyard.com](https://emblem.protoyard.com/) · Privacy: [emblem.protoyard.com/privacy](https://emblem.protoyard.com/privacy/)
 
-[0.20.0 RC3 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.3) adds Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates. Build52 real own INBOX+SENT participant measured Push1.81s and independently verified first Contacts photo5.37s; this is a sample, not a delivery guarantee.
+[0.20.0 RC4 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.4) adds a native Liquid Glass icon: the portrait and ring share one vector foreground, without a glass disk behind them. It also includes Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates. Build52 real own INBOX+SENT participant measured Push1.81s and independently verified first Contacts photo5.37s; this is a sample, not a delivery guarantee.
 
 ## What it does
 
