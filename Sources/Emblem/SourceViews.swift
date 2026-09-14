@@ -86,6 +86,6 @@ struct SourcePreviewView:View {
                 }
                 if let error=preview.error {Text(error).foregroundStyle(.secondary)}
             }.padding(28).frame(maxWidth:640).frame(maxWidth:.infinity,alignment:.topLeading)
-        }.portraitScrollTop().onDisappear {preview.cancel()}
+        }.onDisappear {preview.cancel()}
     }
 }

@@ -105,7 +105,3 @@ or account requests were made by these codec probes. Final signed release
 measurements and runtime CI have separate records. A short codec benchmark does
 not substitute for the fresh build53 natural72-hour resident cohort; the
 original build52 observations and peaks are retained.
-
-## Build 54 native progressive scroll tops
-
-All scrolling surfaces share the system soft top scroll-edge style on macOS26+: sender list/detail, grouped Settings forms, source preview, Help, history, batch lists and the address popover. Photos are not blurred or covered by a custom overlay. Reduced transparency/increased contrast select the more legible system hard style; older systems retain their original appearance. Policy/source-surface/viewport regressions supplement native composited scrolling review; offscreen exports alone do not prove WindowServer blur. Prior build53 memory/mail and72-hour observations remain separately labelled, not final54 acceptance.

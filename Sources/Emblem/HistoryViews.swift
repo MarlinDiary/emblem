@@ -26,9 +26,9 @@ struct HistoryList: View {
                             }
                         }.padding(.vertical, 7).tag(record.id)
                     }
-                }.listStyle(.inset).portraitScrollTop()
+                }.listStyle(.inset)
             }
-        }.portraitScrollTop().onAppear { if model.selectedHistoryID == nil { model.selectedHistoryID = model.records.last?.id } }
+        }.onAppear { if model.selectedHistoryID == nil { model.selectedHistoryID = model.records.last?.id } }
     }
 }
 
@@ -75,7 +75,7 @@ struct HistoryDetail: View {
                         }.font(.caption).foregroundStyle(.secondary).padding(.top, 12)
                     }.font(.callout)
                 }.frame(maxWidth: 440).padding(36).frame(maxWidth: .infinity)
-            }.portraitScrollTop()
+            }
         } else {
             ContentUnavailableView("Your Changes, Kept Locally", systemImage: "clock.arrow.circlepath", description: Text("Backups and undo options appear here after you apply a photo."))
         }

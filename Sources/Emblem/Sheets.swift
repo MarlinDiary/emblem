@@ -68,7 +68,7 @@ struct ApplySheet: View {
                         }
                     }
                 }.padding(16)
-            }.portraitScrollTop().frame(height: min(CGFloat(rows.count) * 58 + 16, 210))
+            }.frame(height: min(CGFloat(rows.count) * 58 + 16, 210))
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             if groupMode {
                 if uniqueContacts == 0 { Toggle("Create one new contact",isOn:$model.allowCreate).toggleStyle(.checkbox) }

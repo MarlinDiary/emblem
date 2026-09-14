@@ -20,28 +20,6 @@ private struct PortraitActionStyle: ViewModifier {
 }
 extension View {
     func portraitAction(prominent: Bool = false) -> some View { modifier(PortraitActionStyle(prominent:prominent)) }
-    /// Let macOS progressively soften content beneath the titlebar/controls.
-    /// This changes the scroll edge, never the photos or their hit-test area.
-    func portraitScrollTop() -> some View { modifier(PortraitScrollTopStyle()) }
-}
-
-private struct PortraitScrollTopStyle: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var contrast
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.scrollEdgeEffectStyle(
-                NativeAppearance.usesGlass(
-                    majorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion,
-                    reduceTransparency: reduceTransparency,
-                    increasedContrast: contrast == .increased
-                ) ? .soft : .hard,
-                for: .top
-            )
-        } else {
-            content
-        }
-    }
 }
 struct NativeActionGroup<Content:View>: View {
     @ViewBuilder var content: () -> Content
