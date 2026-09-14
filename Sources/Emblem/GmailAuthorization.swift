@@ -7,6 +7,9 @@ import PortraitCore
 struct GmailOAuthClient: Codable, Equatable {
     var clientID:String
     var clientSecret:String?
+    // Google rejects desktop token exchange when this configuration is absent.
+    // Keep it in Keychain, and request setup before opening a doomed sign-in.
+    var readyForTokenExchange:Bool {clientSecret?.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty == false}
     static func parse(_ data:Data)throws->Self {
         struct File:Decodable {struct Client:Decodable {var client_id:String;var client_secret:String?};var installed:Client?}
         guard data.count<64_000,let client=try JSONDecoder().decode(File.self,from:data).installed,

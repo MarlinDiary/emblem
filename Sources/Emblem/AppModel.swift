@@ -50,6 +50,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
     @Published var showHistoryTools=false
     @Published var syncAttention:String?
     @Published var lastIgnoredIDs=Set<String>()
+    @Published var ignoreSummary:String?
     var syncFingerprintsReady=false
     var syncPassRunning=false
     var syncTask:Task<Void,Never>?
@@ -554,6 +555,18 @@ struct SenderRow: Identifiable, Codable, Sendable {
         automation.excludedEmails?.insert(id); saveAutomationPreferences()
         rows.removeAll { $0.id == id }; selectedForBatch.remove(id); selectedID = visibleGroupingSnapshot().rows.first?.id; save()
         message = "Removed from the library. Contacts and change history are retained."
+    }
+    /// Wait for cancellation and off-main snapshot encoding before yielding the
+    /// writer lease. No background preference is changed by an app update.
+    func drainAndSave() async throws {
+        isShuttingDown=true
+        let pending=[syncTask,automaticTask,discoveryTask,gmailSyncTask,gmailPushMaintenanceTask,gmailPushListenerTask,gmailSignInTask,task].compactMap{$0}
+        let sent=gmailSentBootstrapTask
+        gmailAuthorization.cancel();stopAutomaticWork();stopGmailPushListening()
+        for t in pending {t.cancel()};sent?.cancel()
+        for t in pending {await t.value}
+        if let sent {_ = try? await sent.value}
+        try await saveAsync()
     }
     func loadDemo() {
         guard demo else { return }

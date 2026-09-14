@@ -66,12 +66,18 @@ import PortraitCore
 }
 
 extension AppModel {
-    func prepareNameFallbacks() async {
+    func prepareNameFallbacks(ids requested: Set<String>? = nil, limit: Int = 24) async {
         guard !preparingNameFallbacks else { return }
         preparingNameFallbacks = true
         defer { preparingNameFallbacks = false }
         var changed = false
-        let ids = rows.filter { !$0.completed && !$0.ignored && $0.current?.image == nil && $0.chosen == nil && $0.lastLookup != nil }.map(\.id)
+        // Bounded batches keep a large newly scanned library off the main actor.
+        // Network lookup time is not a prerequisite for an honest local avatar.
+        let ids = rows.filter { (requested == nil || requested!.contains($0.id)) && !$0.completed && !$0.ignored && $0.current?.image == nil && $0.chosen == nil && $0.selectionIsManual != true }
+            .sorted { a,b in
+                if (a.id == selectedID) != (b.id == selectedID) { return a.id == selectedID }
+                return (a.discoveredAt ?? .distantPast) > (b.discoveredAt ?? .distantPast)
+            }.prefix(max(0,limit)).map(\.id)
         for id in ids {
             guard !Task.isCancelled else { break }
             if let i=rows.firstIndex(where:{$0.id==id}), rows[i].chosen == nil, !rows[i].completed, !rows[i].ignored,
@@ -84,7 +90,10 @@ extension AppModel {
             }
             await Task.yield()
         }
-        if changed { save() }
+        if changed {
+            do {try await saveAsync();kickMailSync()}
+            catch {automaticAttention=error.localizedDescription}
+        }
     }
     /// Storage in Contacts does not turn an applied website image into a new source.
     /// Prefer recorded sync provenance, then exact bytes/pixels; never guess a source.

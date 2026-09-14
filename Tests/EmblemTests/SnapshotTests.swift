@@ -110,6 +110,36 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(try m.engine.records().isEmpty)
         print("V011_REAL_ASSET_SNAPSHOTS=7 CONTACTS_WRITTEN=0 NETWORK_REQUESTS=0")
     }
+    /// Required offline public-artwork regression; no private state or opt-in.
+    @MainActor func testPublicArtworkChoiceBorders() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("public-artwork-"+UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:root)}
+        let output=ProcessInfo.processInfo.environment["EMBLEM_SNAPSHOT_DIR"].map {URL(fileURLWithPath:$0)} ?? root
+        try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+        let originalAppearance=NSApp.appearance;defer {NSApp.appearance=originalAppearance}
+        let manifest=try PublicArtworkTests.assets()
+        for asset in manifest {
+            let candidate=try asset.candidate()
+            for scheme in [ColorScheme.light,.dark] {
+                let name="public-"+asset.name+(scheme == .dark ? "-dark":"-light")
+                try await capture(CandidateTile(candidate:candidate,selected:true,demo:false,action:{}).frame(width:130).padding(6),name:name,size:CGSize(width:142,height:128),scheme:scheme,output:output)
+                let bitmap=try XCTUnwrap(NSBitmapImageRep(data:Data(contentsOf:output.appendingPathComponent(name+".png"))))
+                var xs:[Int]=[],ys:[Int]=[]
+                for y in 0..<bitmap.pixelsHigh {for x in 0..<bitmap.pixelsWide {
+                    if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB),c.blueComponent>0.88,c.redComponent<0.40,c.greenComponent>0.35 {
+                        xs.append(x);ys.append(y)
+                    }
+                }}
+                let x0=try XCTUnwrap(xs.min()),x1=try XCTUnwrap(xs.max()),y0=try XCTUnwrap(ys.min()),y1=try XCTUnwrap(ys.max())
+                XCTAssertGreaterThanOrEqual(x0,10);XCTAssertGreaterThanOrEqual(y0,10)
+                XCTAssertEqual(Double(x0),Double(bitmap.pixelsWide-1-x1),accuracy:1,name)
+                XCTAssertEqual(Double(y0),Double(bitmap.pixelsHigh-1-y1),accuracy:1,name)
+            }
+            try candidate.png.write(to:output.appendingPathComponent("framed-"+asset.name+".png"))
+        }
+        for (index,name) in ["Fastlink","Portrait"].enumerated() {try NameAvatar.candidate(name:name).png.write(to:output.appendingPathComponent("local-type-\(index).png"))}
+        print("PUBLIC_ARTWORK_OFFLINE=\(manifest.count) BORDER_MODES=2 CONTACTS_READ=0 CONTACTS_WRITTEN=0")
+    }
     @MainActor private func capture<V: View>(_ view:V,name:String,size:CGSize,scheme:ColorScheme,output:URL) async throws {
         NSApp.appearance = NSAppearance(named:scheme == .dark ? .darkAqua : .aqua)
         let host=NSHostingView(rootView:view.preferredColorScheme(scheme).background(Color(nsColor: .windowBackgroundColor)))

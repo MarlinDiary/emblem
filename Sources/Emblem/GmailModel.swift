@@ -35,14 +35,14 @@ extension AppModel {
             defer {self.gmailConnecting=false;self.gmailSignInTask=nil}
             do {
                 var client=try self.gmailAuthorization.configuredClient()
-                if client==nil {
+                if client?.readyForTokenExchange != true {
                     let picker=NSOpenPanel();picker.allowedContentTypes=[.json];picker.canChooseDirectories=false;picker.allowsMultipleSelection=false
                     picker.title="Set Up Gmail";picker.message="Choose the Desktop app OAuth JSON downloaded from your Google Cloud project. This is a one-time setup for this open-source build."
                     picker.prompt="Choose Configuration"
                     guard picker.runModal() == .OK,let url=picker.url else{return}
                     try self.gmailAuthorization.importClient(Data(contentsOf:url));client=try self.gmailAuthorization.configuredClient()
                 }
-                guard let client else{return}
+                guard let client,client.readyForTokenExchange else{throw PortraitError.message("The Desktop OAuth configuration is incomplete. Download the full client JSON from Google Cloud and try again.")}
                 let state=try await self.gmailAuthorization.authorize(client:client)
                 try Task.checkCancellation()
                 let tokens=try await GmailAuthorization.freshTokens(state)

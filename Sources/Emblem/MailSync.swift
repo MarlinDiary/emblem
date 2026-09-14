@@ -169,8 +169,8 @@ extension AppModel {
             let explicit=mailSync.explicitChoices[key]
             let representative=members.first(where:{$0.id==explicit}) ?? first
             guard let candidate=representative.chosen,candidate.source == .monogram || candidate.source == .manual || candidate.recommendedAutomatically else{continue}
-            // Wait for an in-flight lookup before creating a fallback-only card.
-            if candidate.source == .monogram && (activeLookups.contains{$0.id==Self.lookupJobKey(representative,gravatar:useGravatar)} || representative.lastLookup == nil && (useWebsite || useGravatar)){continue}
+            // An honest local provisional avatar may sync immediately. A later
+            // web result upgrades only our unchanged automatic photo, same card.
             do {
                 var link=mailSync.links.first{$0.key==key}
                 if let link, explicit == nil,link.desiredHash==digest(candidate.png),
@@ -277,27 +277,39 @@ extension AppModel {
         for i in rows.indices where keys.contains(MailSyncIdentity.key(rows[i])) {rows[i].ignored=true}
         try saveMailSync();save()
         lastIgnoredIDs=Set(rows.filter{keys.contains(MailSyncIdentity.key($0))}.map(\.id))
+        ignoreSummary="Sync stopped"
+        var removed=0,kept=0,protected=0,visited=Set<String>()
         if mailSync.enabled {
             if let live=port as? AppleContacts {try live.requireFullAccess()}
             for key in keys {
                 let linked=mailSync.links.first{$0.key==key}
                 let targetID=linked?.contactID ?? rows.first{MailSyncIdentity.key($0)==key}?.current?.id
-                guard let targetID else{continue}
+                guard let targetID,visited.insert(targetID).inserted else{continue}
                 let history=try engine.records().filter{$0.contactID==targetID && $0.state == .applied}
                 // Never remove a pre-existing user card. Our own photo-only edits may be undone.
-                for record in history.reversed() {try engine.undo(id:record.id)}
+                var preserved=false
+                for record in history.reversed() {
+                    do {try engine.undo(id:record.id)}
+                    catch is UndoProtection {preserved=true;break}
+                }
+                let after=try port.get(id:targetID)
+                if after == nil {removed += 1} else {kept += 1;if preserved {protected += 1}}
                 mailSync.links.removeAll{$0.key==key}
-                for i in rows.indices where MailSyncIdentity.key(rows[i])==key {rows[i].current=try port.get(id:targetID);rows[i].completed=false}
+                for i in rows.indices where MailSyncIdentity.key(rows[i])==key {rows[i].current=after;rows[i].completed=false}
             }
             records=try engine.records();try saveMailSync();save()
         }
+        if protected > 0 {ignoreSummary="Ignored · \(protected) edited \(protected == 1 ? "contact" : "contacts") kept"}
+        else if kept > 0 {ignoreSummary="Ignored · Original \(kept == 1 ? "contact" : "contacts") kept"}
+        else if removed > 0 {ignoreSummary="Ignored · \(removed) \(removed == 1 ? "contact" : "contacts") removed"}
+        else {ignoreSummary="Ignored"}
         reconcileSelection()
     }
     func restoreIgnored(_ ids:Set<String>) {
         let keys=Set(rows.filter{ids.contains($0.id)}.map(MailSyncIdentity.key))
         mailSync.suppressedKeys.subtract(keys);mailSync.links.removeAll{keys.contains($0.key)}
         for i in rows.indices where keys.contains(MailSyncIdentity.key(rows[i])) {rows[i].ignored=false;mailSync.enrolled.insert(rows[i].id)}
-        lastIgnoredIDs=[];do{try saveMailSync();save();kickMailSync()}catch{errorText=error.localizedDescription}
+        lastIgnoredIDs=[];ignoreSummary=nil;do{try saveMailSync();save();kickMailSync()}catch{errorText=error.localizedDescription}
     }
 }
 

@@ -176,7 +176,7 @@ extension AppModel {
         let links=Dictionary(grouping:mailSync.links,by: \.contactID)
         return Set(rows.compactMap { row in
             guard !row.ignored,row.selectionIsManual != true,let chosen=row.chosen,chosen.source == .monogram,
-                  let current=row.current,let link=links[current.id]?.first,link.createdByApp,!link.externalPhoto,
+                  let current=row.current,let link=links[current.id]?.first,!link.externalPhoto,
                   link.desiredHash==digest(chosen.png),link.imageHash==digest(current.image) else{return nil}
             return row.id
         })
@@ -308,6 +308,9 @@ extension AppModel {
                     if $0.discoveredAt != $1.discoveredAt {return ($0.discoveredAt ?? .distantPast)>($1.discoveredAt ?? .distantPast)}
                     return (Self.lookupJobKey($0,gravatar:gravatar),$0.id) < (Self.lookupJobKey($1,gravatar:gravatar),$1.id)
                 }
+                // Make and persist a provisional photo for the next few senders
+                // before starting slow web work. Contacts and lookup are independent.
+                await prepareNameFallbacks(ids: Set(ordered.filter { !inFlight.contains(Self.lookupJobKey($0,gravatar:gravatar)) }.prefix(max(0,3-inFlight.count)).map(\.id)), limit: 3)
                 while inFlight.count < 3 && !ordered.isEmpty {
                     let row = ordered.removeFirst(), key = Self.lookupJobKey(row,gravatar:gravatar)
                     guard inFlight.insert(key).inserted else { continue }

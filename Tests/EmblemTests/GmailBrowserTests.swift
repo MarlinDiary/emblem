@@ -3,6 +3,12 @@ import AppAuth
 @testable import Emblem
 
 final class GmailBrowserTests: XCTestCase {
+    func testIncompletePublicClientNeedsSetupBeforeBrowserOpens() {
+        let id="fixture.apps.googleusercontent.com"
+        XCTAssertFalse(GmailOAuthClient(clientID:id).readyForTokenExchange)
+        XCTAssertFalse(GmailOAuthClient(clientID:id,clientSecret:" ").readyForTokenExchange)
+        XCTAssertTrue(GmailOAuthClient(clientID:id,clientSecret:"fixture-only").readyForTokenExchange)
+    }
     @MainActor func testCancellationAfterLoopbackHandoffAndLateTokenCallbackFinishOnlyOnce() throws {
         var results=[Result<Int,Error>]()
         let gate=GmailAuthorizationGate<Int> {results.append($0)}

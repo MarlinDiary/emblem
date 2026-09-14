@@ -79,6 +79,15 @@ import Combine
             }
         } catch {initializationError=error.localizedDescription}
     }
+    func prepareToQuit(installingUpdate:Bool) async throws {
+        startupTask?.cancel()
+        await startupTask?.value
+        try await model.drainAndSave()
+        if installingUpdate && liveForeground {
+            let service=BackgroundService.service
+            if service.status == .enabled || service.status == .requiresApproval {try await service.unregister()}
+        }
+    }
     func switchMode(demo: Bool) {
         guard !model.busy, !model.isScanning, model.discoveryTask == nil, model.demo != demo else { return }
         model.stopAutomaticWork();model.stopGmailPushListening();model.syncTask?.cancel()
