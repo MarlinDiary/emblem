@@ -77,7 +77,8 @@ describe("Emblem Push Worker", () => {
     const socket = connected.webSocket, ready = nextEvent(socket, "message"); socket.accept();
     expect(JSON.parse((await ready).data)).toEqual({ type: "gmail-history", historyId: "0", reason: "connected" });
     await evictDurableObject(room);
-    const data = btoa(JSON.stringify({ emailAddress: email, historyId: "9001" }));
+    // Real Gmail sends this field as a JSON number, not always a string.
+    const data = btoa(JSON.stringify({ emailAddress: email, historyId: 9001 }));
     const notification = { message: { data, messageId: "fixture-message" } };
     expect((await exports.default.fetch(post("/v1/google-push", idToken, notification))).status).toBe(401);
     const pushToken = await identity(env.PUBSUB_AUDIENCE, env.PUBSUB_SERVICE_ACCOUNT);

@@ -65,7 +65,10 @@ export function decodePubSubMessage(envelope) {
   if (!envelope || typeof envelope !== "object" || !envelope.message || typeof envelope.message !== "object") throw new Error("invalid envelope");
   const decoded = JSON.parse(decodeBase64(envelope.message.data));
   const emailAddress = normalizeEmail(decoded.emailAddress);
-  const historyId = decoded.historyId;
+  // Real Gmail notifications may use a JSON number even though REST cursors
+  // are strings. Convert only exact integers; never silently round uint64 IDs.
+  const historyId = typeof decoded.historyId === "number" && Number.isSafeInteger(decoded.historyId) && decoded.historyId >= 0
+    ? String(decoded.historyId) : decoded.historyId;
   if (typeof historyId !== "string" || !/^[0-9]{1,32}$/.test(historyId)) throw new Error("invalid history id");
   return { emailAddress, historyId };
 }

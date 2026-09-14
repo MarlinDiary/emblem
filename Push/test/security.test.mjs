@@ -26,6 +26,16 @@ test("Pub/Sub decoder validates and normalizes the Gmail envelope", () => {
   assert.throws(() => decodePubSubMessage({ message: { data: Buffer.from("{}").toString("base64") } }));
 });
 
+test("real Gmail notifications accept safe numeric history IDs without rounding", () => {
+  const encode = historyId => ({ message: { data: Buffer.from(JSON.stringify({ emailAddress: "sender@gmail.com", historyId })).toString("base64") } });
+  assert.deepEqual(decodePubSubMessage(encode(9001)), { emailAddress: "sender@gmail.com", historyId: "9001" });
+  for (const invalid of [-1, 1.5, null, true, {}, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => decodePubSubMessage(encode(invalid)));
+  }
+  // Full uint64 values must remain exact strings, never rounded JS numbers.
+  assert.equal(decodePubSubMessage(encode("18446744073709551615")).historyId, "18446744073709551615");
+});
+
 test("bearer parsing and constant-time comparison reject malformed input", () => {
   const token = "fixture-token-long-enough";
   assert.equal(parseBearer(`Bearer ${token}`), token);
