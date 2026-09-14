@@ -1,0 +1,1 @@
+Public first-party brand artwork retained only as reproducible regression fixtures. These assets and trademarks remain the property of their respective owners, are not covered by Emblem’s MIT license, and do not imply endorsement. Provenance and immutable SHA-256 are recorded in manifest.json. No mailbox data or personal portraits are included.

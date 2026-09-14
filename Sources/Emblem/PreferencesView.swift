@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PreferencesView: View {
     @ObservedObject var model: AppModel
+    var updates: SoftwareUpdates? = nil
     @State private var confirmPortraitServices=false
     @State private var disconnectID:String?
     private var version:String {Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "Development"}
@@ -44,6 +45,7 @@ struct PreferencesView: View {
                     if model.backgroundServiceNeedsApproval {Button("Allow Background Activity") {BackgroundService.openSettings()}}
                     if let issue=model.syncAttention {Text(issue).font(.caption).foregroundStyle(.orange)}
                 }
+                if let updates { UpdatePreferences(updates:updates) }
             }.formStyle(.grouped).tabItem {Label("General",systemImage:"gearshape")}
             Form {
                 Section("Photo Sources") {
@@ -99,4 +101,11 @@ struct HelpView:View {
         }
     }
     private func help(_ title:String,_ body:String)->some View {VStack(alignment:.leading,spacing:6){Text(title).font(.headline);Text(body).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)}}
+}
+
+struct UpdatePreferences: View {
+    @ObservedObject var updates:SoftwareUpdates
+    var body:some View {
+        Section("Updates") { Toggle("Check for updates automatically",isOn:$updates.automaticChecks) }
+    }
 }

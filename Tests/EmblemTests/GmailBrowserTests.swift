@@ -3,6 +3,21 @@ import AppAuth
 @testable import Emblem
 
 final class GmailBrowserTests: XCTestCase {
+    @MainActor func testCompleteBundledNativeConfigurationWorksWithoutKeychainSetup() {
+        let id="a.apps.googleusercontent.com"
+        let bundled=GmailAuthorization.client(embeddedID:id,embeddedSecret:"public-native-fixture",stored:nil)
+        XCTAssertTrue(bundled?.readyForTokenExchange == true)
+        XCTAssertEqual(GmailAuthorization.client(embeddedID:id,embeddedSecret:"public-native-fixture",stored:GmailOAuthClient(clientID:id)),bundled)
+        let imported=GmailOAuthClient(clientID:id,clientSecret:"imported-fixture")
+        XCTAssertEqual(GmailAuthorization.client(embeddedID:id,embeddedSecret:"public-native-fixture",stored:imported),imported)
+        XCTAssertEqual(GmailAuthorization.client(embeddedID:id,embeddedSecret:"public-native-fixture",stored:GmailOAuthClient(clientID:"b.apps.googleusercontent.com",clientSecret:"other-fixture")),bundled)
+    }
+    func testIncompletePublicClientNeedsSetupBeforeBrowserOpens() {
+        let id="fixture.apps.googleusercontent.com"
+        XCTAssertFalse(GmailOAuthClient(clientID:id).readyForTokenExchange)
+        XCTAssertFalse(GmailOAuthClient(clientID:id,clientSecret:" ").readyForTokenExchange)
+        XCTAssertTrue(GmailOAuthClient(clientID:id,clientSecret:"fixture-only").readyForTokenExchange)
+    }
     @MainActor func testCancellationAfterLoopbackHandoffAndLateTokenCallbackFinishOnlyOnce() throws {
         var results=[Result<Int,Error>]()
         let gate=GmailAuthorizationGate<Int> {results.append($0)}

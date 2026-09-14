@@ -4,6 +4,12 @@ import AppKit
 import PortraitCore
 @testable import Emblem
 
+// Hosted runners have a 1024x768 virtual screen. Offscreen exports must not
+// silently constrain their requested canvas to that screen's visible frame.
+private final class SnapshotWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+}
+
 final class SnapshotTests: XCTestCase {
     // Offscreen layout exports supplement, but never replace, native window QA.
     // WindowServer-composited materials and toolbar chrome may be absent here.
@@ -110,10 +116,45 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(try m.engine.records().isEmpty)
         print("V011_REAL_ASSET_SNAPSHOTS=7 CONTACTS_WRITTEN=0 NETWORK_REQUESTS=0")
     }
+    /// Required offline public-artwork regression; no private state or opt-in.
+    @MainActor func testPublicArtworkChoiceBorders() async throws {
+        _ = NSApplication.shared
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("public-artwork-"+UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:root)}
+        let output=ProcessInfo.processInfo.environment["EMBLEM_SNAPSHOT_DIR"].map {URL(fileURLWithPath:$0)} ?? root
+        try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+        let originalAppearance=NSApp.appearance;defer {NSApp.appearance=originalAppearance}
+        let manifest=try PublicArtworkTests.assets()
+        for asset in manifest {
+            let candidate=try asset.candidate()
+            for scheme in [ColorScheme.light,.dark] {
+                let name="public-"+asset.name+(scheme == .dark ? "-dark":"-light")
+                try await capture(CandidateTile(candidate:candidate,selected:true,demo:false,action:{}).frame(width:130).padding(6),name:name,size:CGSize(width:142,height:128),scheme:scheme,output:output)
+                let bitmap=try XCTUnwrap(NSBitmapImageRep(data:Data(contentsOf:output.appendingPathComponent(name+".png"))))
+                var xs:[Int]=[],ys:[Int]=[]
+                for y in 0..<bitmap.pixelsHigh {for x in 0..<bitmap.pixelsWide {
+                    if let c=bitmap.colorAt(x:x,y:y)?.usingColorSpace(.deviceRGB),c.blueComponent>0.88,c.redComponent<0.40,c.greenComponent>0.35 {
+                        xs.append(x);ys.append(y)
+                    }
+                }}
+                let x0=try XCTUnwrap(xs.min()),x1=try XCTUnwrap(xs.max()),y0=try XCTUnwrap(ys.min()),y1=try XCTUnwrap(ys.max())
+                // Compare logical padding, not assumed Retina pixels. Hosted
+                // CI renders at 1x; this Mac's WindowServer renders at 2x.
+                let scaleX=Double(bitmap.pixelsWide)/142,scaleY=Double(bitmap.pixelsHigh)/128
+                XCTAssertGreaterThanOrEqual(Double(x0),5*scaleX);XCTAssertGreaterThanOrEqual(Double(y0),5*scaleY)
+                XCTAssertEqual(Double(x0),Double(bitmap.pixelsWide-1-x1),accuracy:1,name)
+                XCTAssertEqual(Double(y0),Double(bitmap.pixelsHigh-1-y1),accuracy:1,name)
+            }
+            try candidate.png.write(to:output.appendingPathComponent("framed-"+asset.name+".png"))
+        }
+        for (index,name) in ["Fastlink","Portrait"].enumerated() {try NameAvatar.candidate(name:name).png.write(to:output.appendingPathComponent("local-type-\(index).png"))}
+        print("PUBLIC_ARTWORK_OFFLINE=\(manifest.count) BORDER_MODES=2 CONTACTS_READ=0 CONTACTS_WRITTEN=0")
+    }
     @MainActor private func capture<V: View>(_ view:V,name:String,size:CGSize,scheme:ColorScheme,output:URL) async throws {
         NSApp.appearance = NSAppearance(named:scheme == .dark ? .darkAqua : .aqua)
-        let host=NSHostingView(rootView:view.preferredColorScheme(scheme).background(Color(nsColor: .windowBackgroundColor)))
-        let window=NSWindow(contentRect:CGRect(origin:.zero,size:size),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+        let host=NSHostingView(rootView:view.preferredColorScheme(scheme).frame(width:size.width,height:size.height).background(Color(nsColor: .windowBackgroundColor)))
+        host.sizingOptions = []
+        let window=SnapshotWindow(contentRect:CGRect(origin:.zero,size:size),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         window.animationBehavior = .none
         window.appearance=NSAppearance(named:scheme == .dark ? .darkAqua : .aqua)
         window.contentView=host; host.frame=CGRect(origin:.zero,size:size)
@@ -121,6 +162,13 @@ final class SnapshotTests: XCTestCase {
         window.orderBack(nil)
         defer { window.orderOut(nil) }
         for _ in 0..<8 { host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds:25_000_000) }
+        // SwiftUI installs MainView's toolbar asynchronously; macOS 26 keeps
+        // the outer window frame and takes its height from the content area.
+        // Restore the export canvas after that native chrome has been added.
+        window.setContentSize(size)
+        for _ in 0..<4 { host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds:25_000_000) }
+        XCTAssertEqual(host.bounds.width,size.width,accuracy:1,name)
+        XCTAssertEqual(host.bounds.height,size.height,accuracy:1,name)
         guard let bitmap=host.bitmapImageRepForCachingDisplay(in:host.bounds) else { return XCTFail("missing bitmap") }
         host.cacheDisplay(in:host.bounds,to:bitmap)
         guard let png=bitmap.representation(using:.png,properties:[:]) else { return XCTFail("missing PNG") }

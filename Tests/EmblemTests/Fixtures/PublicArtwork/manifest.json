@@ -1,0 +1,52 @@
+[
+  {
+    "name": "google",
+    "file": "google.png",
+    "url": "https://storage.googleapis.com/gweb-uniblog-publish-prod/images/GoogleG_Social.max-1440x810.png",
+    "finalURL": "https://storage.googleapis.com/gweb-uniblog-publish-prod/images/GoogleG_Social.max-1440x810.png",
+    "evidenceURL": "https://blog.google/company-news/inside-google/company-announcements/gradient-g-logo-design/",
+    "artwork": "logo",
+    "sha256": "ddf771384c89a1913659e262acb876a24ed8c776ed446d3cadeb1f623d04016b",
+    "bytes": 52242
+  },
+  {
+    "name": "linkedin",
+    "file": "linkedin.png",
+    "url": "https://delivery-p143253-e1476319.adobeaemcloud.com/adobe/assets/urn:aaid:aem:b29b53eb-bcf8-45c5-8df0-edd9f139d53c/original/as/brand-inlogo-download-fg-dsk-v01-2x.png",
+    "finalURL": "https://delivery-p143253-e1476319.adobeaemcloud.com/adobe/assets/urn:aaid:aem:b29b53eb-bcf8-45c5-8df0-edd9f139d53c/original/as/brand-inlogo-download-fg-dsk-v01-2x.png",
+    "evidenceURL": "https://brand.linkedin.com/in-logo",
+    "artwork": "logo",
+    "sha256": "9863cbc719a53dbefc0e28109a584246bd0c0ecd3f64bae7caf215297dc22433",
+    "bytes": 3454
+  },
+  {
+    "name": "raycast",
+    "file": "raycast.png",
+    "url": "https://fz1sd71lwhbqy6sh.public.blob.vercel-storage.com/press/images/logo/raycast-appicon.png?download=1",
+    "finalURL": "https://fz1sd71lwhbqy6sh.public.blob.vercel-storage.com/press/images/logo/raycast-appicon.png?download=1",
+    "evidenceURL": "https://www.raycast.com/press",
+    "artwork": "appIcon",
+    "sha256": "64a195b9c6ada98c2d6927307cfc5b1813f861e25facd1d5bc3a2c7a43b26963",
+    "bytes": 627674
+  },
+  {
+    "name": "tesla",
+    "file": "tesla.jpg",
+    "url": "https://digitalassets.tesla.com/tesla-contents/image/upload/f_auto,q_auto/tesla-logo-thumbnail.jpg",
+    "finalURL": "https://digitalassets.tesla.com/tesla-contents/image/upload/f_auto,q_auto/tesla-logo-thumbnail.jpg",
+    "evidenceURL": "https://www.tesla.com/support/troubleshoot-account",
+    "artwork": "logo",
+    "sha256": "10e2157a6194a5f97e71f87eb78f77f5915347f76e19d6b306c7258004adaf15",
+    "bytes": 27601
+  },
+  {
+    "name": "cursor",
+    "file": "cursor.png",
+    "url": "https://cursor.com/apple-touch-icon.png",
+    "finalURL": "https://cursor.com/apple-touch-icon.png",
+    "evidenceURL": "https://cursor.com/",
+    "artwork": "appIcon",
+    "sha256": "a58b05bda2cafddc8a611affe7bb934fe307f94e948a04d2535ef90b734cd64e",
+    "bytes": 7047
+  }
+]

@@ -5,6 +5,7 @@ import PortraitCore
 struct EmblemApp: App {
     @NSApplicationDelegateAdaptor(BackgroundLifecycle.self) private var lifecycle
     @StateObject private var session: AppSession
+    @StateObject private var updates = SoftwareUpdates()
     init() {
         let args = CommandLine.arguments
         if args.contains("--diagnose-receipt-order") {Task {exit(await ReceiptOrderDiagnostics.run(arguments:args))};RunLoop.main.run()}
@@ -33,10 +34,17 @@ struct EmblemApp: App {
                 if session.isReady {MainView(model:session.model,session:session)}
                 else {VStack(spacing:12) {if let error=session.initializationError {Text(error)} else {ProgressView();Text("Opening Your Library").foregroundStyle(.secondary)}}}
             }.frame(minWidth:900,minHeight:620).preferredColorScheme(session.appearance)
+                .task(id:session.isReady) {
+                    BackgroundLifecycle.session=session; BackgroundLifecycle.updates=updates
+                    updates.start(ready:session.isReady)
+                }
         }
         .defaultSize(width: session.size.width, height: session.size.height)
         .windowToolbarStyle(.automatic)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updates.check() }.disabled(!updates.available)
+            }
             CommandGroup(replacing: .appTermination) { Button("Quit Emblem") {NSApp.terminate(nil)}.keyboardShortcut("q") }
             CommandGroup(after: .sidebar) {
                 Button(session.model.section == "ignored" ? "Show All Senders" : "Show Ignored Senders") {session.model.section = session.model.section == "ignored" ? "all" : "ignored"}
@@ -64,7 +72,7 @@ struct EmblemApp: App {
             CommandGroup(after: .windowArrangement) { MainWindowCommand() }
         }
         Settings {
-            PreferencesView(model: session.model).frame(width: 550, height: 480).preferredColorScheme(session.appearance)
+            PreferencesView(model: session.model,updates:updates).frame(width: 550, height: 480).preferredColorScheme(session.appearance)
         }
         Window("Photo Sources · Emblem", id: "sources") { SourcePreviewView(model: session.model).frame(minWidth: 820, minHeight: 600).preferredColorScheme(session.appearance) }.defaultSize(width: 1000, height: 760)
         Window("Emblem Help", id: "help") { HelpView().frame(minWidth: 480, minHeight: 500) }.defaultSize(width: 540, height: 620)
@@ -134,7 +142,7 @@ struct MainView: View {
         .navigationSplitViewStyle(.balanced)
         .safeAreaInset(edge:.bottom,spacing:0) {
             if !model.lastIgnoredIDs.isEmpty {
-                HStack {Text("Ignored").foregroundStyle(.secondary);Spacer();Button("Undo") {model.restoreIgnored(model.lastIgnoredIDs)}}.font(.callout).padding(12)
+                HStack {Text(model.ignoreSummary ?? "Ignored").foregroundStyle(.secondary);Spacer();Button("Undo") {model.restoreIgnored(model.lastIgnoredIDs)}}.font(.callout).padding(12)
             }
             BatchProgressStrip(model:model)
         }

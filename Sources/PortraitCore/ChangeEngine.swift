@@ -169,9 +169,9 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
         guard let index = records.firstIndex(where: { $0.id == id }), records[index].state == .applied, let contactID = records[index].contactID else { throw PortraitError.message("This record is unfinished or already undone.") }
         let record = records[index]
         if let current = try store.get(id: contactID) {
-            guard photoMatches(current.image,encodedHash:record.afterHash,pixelHash:record.afterPixelHash) else { throw PortraitError.message("This contact’s photo changed after Emblem applied it. Your newer photo is preserved.") }
+            guard photoMatches(current.image,encodedHash:record.afterHash,pixelHash:record.afterPixelHash) else { throw UndoProtection.photoChanged }
             if let expected=record.afterEmailsHash {
-                guard digestEmails(current.emails) == expected else { throw PortraitError.message("This contact’s email addresses changed after Emblem applied them. The current contact is preserved.") }
+                guard digestEmails(current.emails) == expected else { throw UndoProtection.emailsChanged }
             }
             if let beforeName=record.beforeName,let afterName=record.afterName {
                 let restored=try store.rename(id:contactID,expectedName:afterName,name:beforeName)
@@ -179,7 +179,7 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
             } else if record.created {
                 let unchanged = try store.historyUnchanged(for: contactID, since: record.historyToken)
                 guard PortraitPolicy.mayDelete(createdByApp: record.created, imageMatches: true, historyUnchanged: unchanged) else {
-                    throw PortraitError.message("This contact has later edits or its change history expired. The contact is preserved for review in Contacts.")
+                    throw UndoProtection.laterEdits
                 }
                 try store.delete(id: contactID)
                 guard try store.get(id: contactID) == nil else { throw PortraitError.message("The contact was still present on read-back. Review it in Contacts.") }
@@ -238,4 +238,16 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
     public func delete(id: String) throws { contacts.removeValue(forKey: id); try persist() }
     public func historyToken() -> Data? { Data(String(externalRevision).utf8) }
     public func historyUnchanged(since token: Data?) throws -> Bool { token != nil && token == historyToken() }
+}
+
+/// Expected preservation, distinct from a failed Contacts write or journal I/O.
+public enum UndoProtection: LocalizedError {
+    case photoChanged, emailsChanged, laterEdits
+    public var errorDescription:String? {
+        switch self {
+        case .photoChanged:return "This contact’s photo changed after Emblem applied it. Your newer photo is preserved."
+        case .emailsChanged:return "This contact’s email addresses changed after Emblem applied them. The current contact is preserved."
+        case .laterEdits:return "This contact has later edits or its change history expired. The contact is preserved for review in Contacts."
+        }
+    }
 }

@@ -26,10 +26,22 @@ if [[ -e "$APP" ]]; then
   exit 2
 fi
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/Emblem" "$APP/Contents/MacOS/Emblem"
+if [[ "${EMBLEM_UNIVERSAL:-0}" == "1" ]]; then
+  INTEL_ARGS=(-c release --scratch-path "${SCRATCH}-intel" --triple x86_64-apple-macosx14.0 --sdk "$SDK"
+    -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$SDK_VERSION")
+  swift build "${INTEL_ARGS[@]}" --product Emblem
+  INTEL_BIN="$(swift build "${INTEL_ARGS[@]}" --show-bin-path)"
+  lipo -create "$BIN/Emblem" "$INTEL_BIN/Emblem" -output "$APP/Contents/MacOS/Emblem"
+else
+  cp "$BIN/Emblem" "$APP/Contents/MacOS/Emblem"
+fi
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 cp "$ROOT/Sources/PortraitCore/Resources/public_suffix_list.dat" "$APP/Contents/Resources/"
 cp "$ROOT/Sources/PortraitCore/Resources/claude-icon.svg" "$APP/Contents/Resources/"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+SOURCE_REVISION="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+[[ -z "$SOURCE_REVISION" ]] || plutil -insert EmblemSourceRevision -string "$SOURCE_REVISION" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/ThirdPartyNotices.txt" "$APP/Contents/Resources/"
 # Include dependency privacy manifests and package resources.
 for RESOURCE in "$BIN"/*.bundle; do
@@ -38,6 +50,10 @@ done
 if [[ -n "${EMBLEM_GOOGLE_CLIENT_ID:-}" ]]; then
   [[ "$EMBLEM_GOOGLE_CLIENT_ID" == *.apps.googleusercontent.com ]] || exit 4
   plutil -insert EmblemGoogleClientID -string "$EMBLEM_GOOGLE_CLIENT_ID" "$APP/Contents/Info.plist"
+fi
+if [[ -n "${EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE:-}" ]]; then
+  python3 "$ROOT/Scripts/apply-native-oauth-config.py" "$EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE" "$APP/Contents/Info.plist"
+  export EMBLEM_GOOGLE_CLIENT_ID="$(/usr/libexec/PlistBuddy -c 'Print :EmblemGoogleClientID' "$APP/Contents/Info.plist")"
 fi
 # Push is an all-or-nothing build configuration; a partially configured app
 # remains an ordinary Gmail client rather than advertising instant updates.
@@ -65,7 +81,18 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
   COUNT="$(printf '%s\n' "$IDENTITIES" | grep -c '^[A-F0-9]' || true)"
   if [[ "$COUNT" == "1" ]]; then SIGN_IDENTITY="$IDENTITIES"; else SIGN_IDENTITY="-"; fi
 fi
-codesign --force --options runtime --entitlements "$ROOT/Resources/Emblem.entitlements" --sign "$SIGN_IDENTITY" "$APP"
+# Unsigned/ad-hoc source builds have no Team ID; enable Hardened Runtime only
+# for real Developer ID distributions so development can load its own framework.
+SIGN_OPTIONS=(--timestamp=none)
+[[ "$SIGN_IDENTITY" == "-" ]] || SIGN_OPTIONS=(--options runtime)
+# Sign nested code inside-out. Preserve the upstream XPC entitlements rather
+# than granting Contacts/Mail privileges to the updater's downloader/installer.
+FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for NESTED in "$FRAMEWORK/XPCServices/Downloader.xpc" "$FRAMEWORK/XPCServices/Installer.xpc" "$FRAMEWORK/Autoupdate" "$FRAMEWORK/Updater.app"; do
+  codesign --force "${SIGN_OPTIONS[@]}" --preserve-metadata=identifier,entitlements --sign "$SIGN_IDENTITY" "$NESTED"
+done
+codesign --force "${SIGN_OPTIONS[@]}" --sign "$SIGN_IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
+codesign --force "${SIGN_OPTIONS[@]}" --entitlements "$ROOT/Resources/Emblem.entitlements" --sign "$SIGN_IDENTITY" "$APP"
 codesign --verify --deep --strict "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 echo "APP=$APP"

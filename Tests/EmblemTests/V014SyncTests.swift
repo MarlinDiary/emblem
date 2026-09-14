@@ -58,6 +58,15 @@ final class V014SyncTests:XCTestCase {
   try await m.performMailSync();XCTAssertTrue(try m.port.matches(email:m.rows[0].id).isEmpty)
   m.restoreIgnored(ids);m.syncTask?.cancel();m.syncTask=nil;try await m.performMailSync();XCTAssertEqual(try m.port.matches(email:m.rows[0].id).count,1)
  }
+ @MainActor func testIgnoreKeepsLaterEditedCardButProcessesOtherSenders()async throws {
+  let m=try model();m.rows=[try row("first@fixture.test",name:"First"),try row("second@fixture.test",name:"Second")];enable(m)
+  try await m.performMailSync();let first=try XCTUnwrap(m.rows[0].current?.id),second=try XCTUnwrap(m.rows[1].current?.id)
+  _=try m.port.setImage(id:first,image:try NameAvatar.candidate(name:"Changed",variant:2).png)
+  try await m.ignoreSyncedSenders(Set(m.rows.map(\.id)))
+  XCTAssertNotNil(try m.port.get(id:first));XCTAssertNil(try m.port.get(id:second))
+  XCTAssertTrue(m.rows.allSatisfy(\.ignored));XCTAssertEqual(m.ignoreSummary,"Ignored · 1 edited contact kept")
+  XCTAssertTrue(m.mailSync.links.isEmpty)
+ }
  @MainActor func testIgnoreExistingPhotoNeverDeletesUserCard()async throws {
   let m=try model();m.rows=[try row()];let c=try NameAvatar.candidate(name:"SevenRooms",variant:2)
   let contact=try m.port.create(name:"Original",email:m.rows[0].id,image:c.png);enable(m);try await m.performMailSync();try await m.ignoreSyncedSenders([m.rows[0].id])

@@ -1,0 +1,47 @@
+name: Signed release runtime
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Emblem release tag
+        required: true
+        type: string
+      archive_sha256:
+        description: Independently verified SHA256 of the public ZIP
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  signed-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-15-intel, macos-26, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact published archive
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA256: ${{ inputs.archive_sha256 }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          curl -fL --retry 2 "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/Emblem-0.20.0-macOS.zip" -o "$RUNNER_TEMP/Emblem.zip"
+          echo "$EXPECTED_SHA256  $RUNNER_TEMP/Emblem.zip" | shasum -a 256 -c -
+          ditto -x -k "$RUNNER_TEMP/Emblem.zip" "$RUNNER_TEMP/signed-runtime"
+      - name: Exact signed distribution lifecycle and isolated rollback
+        run: |
+          app="$RUNNER_TEMP/signed-runtime/Emblem.app"
+          xcrun lipo -info "$app/Contents/MacOS/Emblem"
+          codesign --verify --deep --strict "$app"
+          codesign -dvv "$app" 2>&1 | grep '^TeamIdentifier=33G9D6C5H4$'
+          xcrun stapler validate "$app"
+          "$app/Contents/MacOS/Emblem" --headless-fixture
+          "$app/Contents/MacOS/Emblem" --contact-worker-launch-fixture --data-dir "$RUNNER_TEMP/workspace-worker"
+          "$app/Contents/MacOS/Emblem" --agent-application-fixture --data-dir "$RUNNER_TEMP/agent-fixture"
+          "$app/Contents/MacOS/Emblem" --self-test --data-dir "$RUNNER_TEMP/signed-fixtures" | tee "$RUNNER_TEMP/self-test.log"
+          fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
+          EMBLEM_BINARY="$app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"

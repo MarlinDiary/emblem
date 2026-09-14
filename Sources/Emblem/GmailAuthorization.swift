@@ -7,6 +7,9 @@ import PortraitCore
 struct GmailOAuthClient: Codable, Equatable {
     var clientID:String
     var clientSecret:String?
+    // Google rejects desktop token exchange when this configuration is absent.
+    // Installed-app configuration is public; user authorization is not.
+    var readyForTokenExchange:Bool {clientSecret?.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty == false}
     static func parse(_ data:Data)throws->Self {
         struct File:Decodable {struct Client:Decodable {var client_id:String;var client_secret:String?};var installed:Client?}
         guard data.count<64_000,let client=try JSONDecoder().decode(File.self,from:data).installed,
@@ -73,14 +76,17 @@ enum GmailKeychain {
     }
     func configuredClient()throws->GmailOAuthClient? {
         let embedded=Bundle.main.object(forInfoDictionaryKey:"EmblemGoogleClientID") as? String
+        let configuration=Bundle.main.object(forInfoDictionaryKey:"EmblemGoogleClientSecret") as? String
         let stored=try GmailKeychain.read(Self.clientKey).map{try JSONDecoder().decode(GmailOAuthClient.self,from:$0)}
-        return Self.client(embeddedID:embedded,stored:stored)
+        return Self.client(embeddedID:embedded,embeddedSecret:configuration,stored:stored)
     }
-    static func client(embeddedID:String?,stored:GmailOAuthClient?)->GmailOAuthClient? {
+    static func client(embeddedID:String?,embeddedSecret:String?=nil,stored:GmailOAuthClient?)->GmailOAuthClient? {
         guard let id=embeddedID,id.hasSuffix(".apps.googleusercontent.com") else{return stored}
         // Preserve an imported desktop client's matching configuration. Never
         // attach another OAuth client's secret to the embedded public client ID.
-        return stored?.clientID == id ? stored:GmailOAuthClient(clientID:id)
+        if let stored,stored.clientID == id,stored.readyForTokenExchange {return stored}
+        let bundled=GmailOAuthClient(clientID:id,clientSecret:embeddedSecret)
+        return bundled.readyForTokenExchange ? bundled:(stored?.clientID == id ? stored:bundled)
     }
     func importClient(_ data:Data)throws {try GmailKeychain.save(JSONEncoder().encode(GmailOAuthClient.parse(data)),account:Self.clientKey)}
     static func request(client:GmailOAuthClient,redirect:URL)->OIDAuthorizationRequest {

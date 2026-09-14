@@ -1,5 +1,11 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -12,14 +18,53 @@ jobs:
         run: |
           xcodebuild -version
           test "$(xcrun --sdk macosx --show-sdk-version | cut -d. -f1)" -ge 26
-      - run: swift test
+      - name: Unit and required public-artwork rendering regressions
+        env:
+          EMBLEM_SNAPSHOT_DIR: ${{ runner.temp }}/emblem-snapshots
+        run: swift test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-view-regressions
+          path: ${{ runner.temp }}/emblem-snapshots
       - run: python3 -m unittest discover -s Tests/Operations -v
-      - run: bash Scripts/build-app.sh
+      - run: EMBLEM_UNIVERSAL=1 bash Scripts/build-app.sh
       - name: Isolated lifecycle and rollback
         run: |
           build/Emblem.app/Contents/MacOS/Emblem --self-test --data-dir "$RUNNER_TEMP/emblem-fixtures" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
           EMBLEM_BINARY="$PWD/build/Emblem.app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"
+      - name: Preserve universal package and symlinks
+        run: ditto -c -k --keepParent build/Emblem.app "$RUNNER_TEMP/Emblem-ci.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universal-runtime-package
+          path: ${{ runner.temp }}/Emblem-ci.zip
+  compatibility:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-15-intel, macos-26, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: universal-runtime-package
+          path: runtime
+      - name: Minimum OS and isolated execution acceptance
+        run: |
+          ditto -x -k runtime/Emblem-ci.zip runtime
+          app="$PWD/runtime/Emblem.app"
+          xcrun lipo -info "$app/Contents/MacOS/Emblem"
+          codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/Emblem" --contact-worker-launch-fixture --data-dir "$RUNNER_TEMP/workspace-worker"
+          "$app/Contents/MacOS/Emblem" --agent-application-fixture --data-dir "$RUNNER_TEMP/agent-fixture"
+          "$app/Contents/MacOS/Emblem" --self-test --data-dir "$RUNNER_TEMP/emblem-runtime" | tee "$RUNNER_TEMP/self-test.log"
+          fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"
+          EMBLEM_BINARY="$app/Contents/MacOS/Emblem" bash Scripts/rollback.sh --fixture "$fixture"
   push-relay:
     runs-on: ubuntu-latest
     timeout-minutes: 10

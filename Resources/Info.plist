@@ -23,7 +23,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.20.0</string>
 	<key>CFBundleVersion</key>
-    <string>44</string>
+    <string>52</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>LSApplicationCategoryType</key>
@@ -36,5 +36,19 @@
 	<string>Emblem matches sender photos to Contacts. With automatic sync enabled, it updates photos and adds new senders. Existing personal photos are preserved unless you choose a replacement.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://emblem.protoyard.com/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>yTOUaqS7UUelSjMQlm7c+vbP+ISqbxRQAUL6DOMe6OM=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
 </dict>
 </plist>

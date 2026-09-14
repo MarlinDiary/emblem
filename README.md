@@ -5,9 +5,11 @@ Emblem is a local-first macOS companion for sender avatars in Apple Mail. It dis
 - Native SwiftUI and AppKit interface with macOS materials and controls
 - No Mail plug-in, browser extension, hosted account, analytics, or menu-bar item
 - Open source under the MIT License
-- Current version: **0.19.0**
+- Current source: **0.20.0**; latest stable download: **0.19.0**
 
 Download: [Emblem 0.19.0 for macOS](https://github.com/MarlinDiary/emblem/releases/download/v0.19.0/Emblem-0.19.0-macOS.zip) · Website: [emblem.protoyard.com](https://emblem.protoyard.com/) · Privacy: [emblem.protoyard.com/privacy](https://emblem.protoyard.com/privacy/)
+
+[0.20.0 RC1 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.1) adds Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates.
 
 ## What it does
 
@@ -28,7 +30,7 @@ Emblem evaluates sources by identity evidence, clarity, and circular suitability
 4. Apple Touch Icons, Web App Manifest icons, and structured website logos
 5. website icons and a registrable-domain icon fallback
 6. optional Libravatar and Gravatar lookups
-7. a crisp, deterministic monogram generated on the Mac
+7. a crisp, deterministic monogram generated on the Mac immediately while better artwork is fetched; unchanged app-managed provisional photos can upgrade automatically
 
 Raster candidates below the quality threshold, blank/placeholder portraits, and badly blurred brand images are rejected. Person photos use a centered fill; ordinary logos retain a safe area; declared app-icon canvases and maskable artwork preserve their intended geometry.
 
@@ -43,7 +45,7 @@ Automatic Contacts sync is opt-in. Once enabled, new eligible senders and select
 
 ### Background operation
 
-**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. It runs approximately once a minute while the user is logged in and the Mac is awake. The tagged 0.19.0 release uses polling. The development branch adds Gmail instant updates; see [Push operations and acceptance](docs/gmail-push-operations.md).
+**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. Gmail Push notifications wake the resident helper immediately. A 15-minute safety check recovers missed hints when every account has healthy Push; non-Push/failed Gmail or Apple Mail fallback retains its one-minute scheduling while awake. Watches renew automatically each day. The older tagged 0.19.0 release uses polling; current `main` includes Push. See [Push operations and acceptance](docs/gmail-push-operations.md).
 
 The foreground app and background job share an exclusive library lease, so they do not write the local library or Contacts concurrently.
 
@@ -54,6 +56,14 @@ Version 0.18 replaces the sender sidebar's per-row SwiftUI tree with a virtualiz
 Background passes transform the decoded library before publishing it once, retain that loaded revision, persist receipt-only Gmail changes in a small overlay, and bound Contacts history IPC before conservatively falling back to a linked-card read. Legacy photo-fingerprint enrichment is versioned and runs once. New mail and idle shutdown therefore do not copy, rescan, or re-encode every cached image.
 
 Regression coverage includes a 1,800-row native table, a 903-row selection benchmark, empty Gmail history pages that leave the large sender library untouched, and a Contacts change-history fast path.
+
+## App updates
+
+The visible app checks an Ed25519-signed update feed with Sparkle. Disable automatic checks in Settings; installation is your choice. Workers and the background mail helper never launch update UI. See [software updates](docs/software-updates.md).
+
+## Public Gmail readiness
+
+Public Google verification and clean-Mac OAuth onboarding are separate release gates. Official packages can include complete public Desktop application configuration; source builds without it request a Desktop OAuth JSON before sign-in. An existing authorized account is not proof of public approval. See [Google verification](docs/google-verification.md) and [release acceptance](docs/acceptance-0.20.md).
 
 ## Requirements
 
@@ -89,12 +99,14 @@ For a source build:
 2. Open Emblem → Settings → General → **Connect Gmail…**.
 3. Choose the downloaded desktop client JSON once, then finish consent in the system browser.
 
-The imported client configuration and account authorization are stored in the macOS Keychain, not the sender library. Maintainers can bundle a public client identifier at build time:
+Imported client configuration and private account authorization are stored in the macOS Keychain, not the sender library. Official packages can include Google’s public **installed-application** configuration at build time; this never includes user access/refresh tokens, Apple passwords or service-account keys:
 
 ```sh
-EMBLEM_GOOGLE_CLIENT_ID='YOUR_CLIENT_ID.apps.googleusercontent.com' \
+EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE='/absolute/path/to/desktop-client.json' \
   bash Scripts/build-app.sh
 ```
+
+Google describes installed-app client configuration as [public, embedded application configuration](https://developers.google.com/identity/protocols/oauth2#installed-applications), not confidential user authorization. PKCE and browser consent remain required. The build validates Desktop type and rejects tokens and service-account configurations.
 
 A broadly distributed OAuth client must satisfy Google's consent-screen and restricted-scope requirements. Testing-mode grants may have shorter lifetimes.
 
