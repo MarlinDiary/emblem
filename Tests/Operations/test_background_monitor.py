@@ -22,3 +22,13 @@ class BackgroundMonitorTests(unittest.TestCase):
   self.assertTrue(m.summary(points,259200,True)['accepted'])
   points[-1]['healthyPushAccounts']=0
   self.assertFalse(m.summary(points,259200,True)['accepted'])
+
+ def testForegroundAndWorkerActivityAreNotCalledHelperIdle(self):
+  def point(t,processes):return dict(epoch=t,online=True,syncExpected=True,accountCount=1,healthyPushAccounts=1,watchRenewalEpochs=[86400 if t else 0],boot='one',processes=processes)
+  helper=dict(role='helper',cpu=.1,rssMB=100)
+  points=[point(0,[helper]),point(60,[helper,dict(role='foreground',cpu=90,rssMB=900)]),point(120,[helper,dict(role='worker',cpu=50,rssMB=700)]),point(259200,[helper])]
+  result=m.summary(points,259200,True)
+  self.assertEqual(result['idleCPUP95'],.1)
+  self.assertEqual(result['rssMBP95'],100)
+  self.assertEqual(result['idleSamples'],2)
+  self.assertTrue(result['accepted'])

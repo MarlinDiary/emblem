@@ -56,7 +56,10 @@ def sample(root, now, online):
 def summary(points, duration, complete):
     eligible=[p for p in points if p['online'] is True and p['syncExpected'] and p['accountCount']>0]
     healthy=[p for p in eligible if p['healthyPushAccounts']==p['accountCount'] and any(x['role']=='helper' for x in p['processes'])]
-    idle=[p for p in points if not any(x['role']=='worker' for x in p['processes'])]
+    # Measure the resident helper, not CPU/RSS from someone actively using the
+    # foreground app. Retain every raw point; only the idle metric cohort is
+    # restricted. A missing helper is still a Push availability failure.
+    idle=[p for p in points if p['processes'] and all(x['role']=='helper' for x in p['processes'])]
     cpu=[sum(x['cpu'] for x in p['processes']) for p in idle if p['processes']]
     memory=[sum(x['rssMB'] for x in p['processes']) for p in idle if p['processes']]
     def percentile(values,q):return sorted(values)[min(len(values)-1,math.ceil(len(values)*q)-1)] if values else None
@@ -69,7 +72,8 @@ def summary(points, duration, complete):
                 memory=bool(memory) and percentile(memory,.95)<500,automaticWatchRenewal=renewed)
     return dict(status='completed' if complete else 'running',requestedSeconds=duration,elapsedSeconds=round(elapsed,1),samples=len(points),
                 installedBuilds=sorted(set(p.get('installedBuild','fixture') for p in points)),eligibleOnlineSamples=len(eligible),pushHealthyFraction=fraction,idleCPUMedian=statistics.median(cpu) if cpu else None,
-                idleCPUP95=percentile(cpu,.95),rssMBP95=percentile(memory,.95),distinctBoots=len(set(p['boot'] for p in points)),
+                idleCPUP95=percentile(cpu,.95),rssMBP95=percentile(memory,.95),idleSamples=len(idle),
+                idleScope='Resident helper only; foreground/worker samples retained but excluded from idle metrics.',distinctBoots=len(set(p['boot'] for p in points)),
                 longGaps=sum(b['epoch']-a['epoch']>180 for a,b in zip(points,points[1:])),watchRenewalObserved=renewed,
                 checks=checks,accepted=complete and all(checks.values()),
                 boundary='Natural awake/online observation; gaps do not prove sleep or forced reboot. Short runs are not multi-day acceptance.',

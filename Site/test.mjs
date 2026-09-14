@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import worker from './worker.mjs';
 const origin='https://emblem.protoyard.com';
 for(const path of ['/','/privacy/','/terms/','/style.css','/icon.svg','/license.txt','/robots.txt','/sitemap.xml','/appcast.xml']) {
@@ -27,3 +28,8 @@ for(const phrase of ['gmail.metadata','Limited Use','Keychain','not anonymous','
 console.log('PASS links, privacy disclosures, redirects, 404, method boundary and no embedded credentials');
 
 const feed=await (await worker.fetch(new Request(origin+'/appcast.xml'))).text();assert.match(feed,/sparkle-signatures:/);assert.match(feed,/<channel>/);
+const appGlyph=await readFile(new URL('../Resources/AppIcon.icon/Assets/Emblem.svg',import.meta.url),'utf8');
+const siteIcon=await (await worker.fetch(new Request(origin+'/icon.svg'))).text();
+assert.equal(siteIcon.match(/ d="([^"]+)"/)[1],appGlyph.match(/ d="([^"]+)"/)[1]);
+assert.equal((siteIcon.match(/<path /g)||[]).length,1);
+console.log('PASS website reuses the app portrait-and-ring compound glyph');
