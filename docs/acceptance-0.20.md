@@ -122,3 +122,18 @@ registered helper and runtime-matrix checks are recorded independently. Preserve
 build53's complete observations before replacing the installed bundle; build54
 has a separate natural observation cohort, not a continuation or reset of the
 previous cohort's elapsed-time claim.
+
+## Build55 approved warm-gray icon
+
+RC5 adopts the user-approved four-vector native icon: head above a gray Multiply
+lens, body below it, separate recess behind the body. The lower body arc shares
+the lens geometry and the lens has no bright specular upper rim. Default/Dark/
+Mono, generation26 fallback and small-size exports have their own review record.
+Packaging preserves native materials; application Swift sources are unchanged.
+
+Exact signed public archive, native resource layers, notarization, installation,
+registered helper and isolated runtime matrix have independent verification
+records. Build54 observations are preserved. Build55 starts a new natural
+72-hour cohort; earlier cohorts and bounded tests are not relabelled as its
+elapsed time. Stable0.19 feed stays unchanged while long-duration acceptance,
+Google verification and clean-Mac account onboarding remain open.

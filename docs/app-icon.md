@@ -1,60 +1,53 @@
 # Native layered app icon
 
-`Resources/AppIcon.icon` is an editable Apple Icon Composer document, not a
-flattened glass-effect image. It keeps Emblem's blue background with **one
-foreground layer**: the portrait and circular ring combined in `Assets/Emblem.svg`.
-There is no glass disk behind the portrait. The circular interior is a genuine
-cutout that reveals the system-rendered blue background.
+`Resources/AppIcon.icon` is the approved editable Icon Composer document for
+build55, with a warm ivory/gray/sage background and four original vector assets.
+There are no colored page tabs, rasterized highlights or baked glass effects.
+Front to back: **Head.svg → Lens.svg → Body.svg → Well.svg**.
 
-The single compound vector path joins the shoulders into the ring without
-stacked edges or duplicate shadows. Its head, cutout and outer circle share one
-material group and one image layer. Blur is disabled so the silhouette remains
-crisp. The artwork has no baked shadows, highlights, enclosure mask, raster
-scaling or gradients; Icon Composer and the system supply those effects.
+The head is above the circular glass; the body is below it. Head and body each
+contain just one white path, with no portrait background disk. The body's lower
+arc and the lens share center(512,512), radius280, so the bottom silhouette meets
+the lens edge. The separate recess is behind the body, not part of its artwork.
+The gray gradient lens uses Multiply, opacity0.8, refractivity strength0.86 and
+depth0.26. Specular is disabled on this group: no bright white upper circular rim.
+This is independently drawn artwork, not extracted Contacts app imagery.
 
-`Scripts/build-app.sh` calls `Scripts/build-icon.sh` before code signing. Apple's
-`actool` emits `Assets.car`, a compatible `AppIcon.icns`, and icon metadata. The
-helper merges only the generated `CFBundleIconName` and `CFBundleIconFile` keys
-and removes its temporary compiler output. Existing root catalogs are rejected
-instead of overwritten. An icon compile failure fails the build; it never
-silently switches back to the old flat icon.
+`Scripts/build-app.sh` calls `Scripts/build-icon.sh` before signing. Apple's
+`actool` emits native `Assets.car` (four vector resources, four material groups
+per appearance, five-layer stacks including background) and compatible
+`AppIcon.icns`. Only generated icon metadata is merged into Info.plist. Existing
+root catalogs are rejected and compile errors stop packaging without altering
+existing resources.
 
-The deployment target stays macOS 14. Older systems use the compiler-generated
-fallback; supported systems render the layered appearance. The refractivity
-annotations were authored with Icon Composer 27 and verified with Xcode 27.
-Xcode 26 builds the same vector foreground and standard native glass material
-using a temporary document with only the 27-specific refractivity annotations
-removed. It does not rasterize the icon or modify its editable source. Older OS
-appearance behavior remains a runtime check. The Icon Composer
-companion `ictool` was used to export and visually review Default, Dark and Mono
-at 1024px with design generations 26 and 27. These are native material renders,
-not image-editor approximations; the installed app was not replaced for review.
+The deployment target remains macOS14. Xcode27 compiles the complete source.
+Xcode26 uses a temporary document stripped only of 27-specific refractivity
+annotations: all four vectors, ordering, standard materials and geometry remain
+unchanged. No flattening or editable-source modification is involved. Older OS
+appearance behavior still has a separate runtime check.
 
-Use Icon Composer's companion tool (not the different developer `ictool` shim):
+Native Icon Composer exports reviewed include Default, Dark and Mono at1024px,
+Default at64px, and design generations26 and27. The generation27 upper lens arc
+regression used12420 identical pixels: the rejected white-lid draft had3031
+near-white pixels; the approved gray lens has0. This bounded test is about the
+upper circular rim, not all highlights on the outer app enclosure.
 
 ```sh
 XCODE_APP="$(dirname "$(dirname "$(xcode-select -p)")")"
 ICTOOL="$XCODE_APP/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
 "$ICTOOL" "$PWD/Resources/AppIcon.icon" --export-image \
   --output-file "$PWD/icon-default.png" --platform macOS --rendition Default \
-  --width 1024 --height 1024 --scale 1 --design-generation 26
-```
-
-Repeat with `Dark` or `Mono` for their previews. Generation 27 can also be
-exported with this toolchain; rendering on an older macOS remains a runtime gate.
-
-Run the resource and real compiler regressions with:
-
-```sh
+  --width 1024 --height 1024 --scale 1 --design-generation 27
 python3 -m unittest discover -s Tests/Operations -p test_app_icon.py -v
 ```
 
-This resource change is build 54. The initial resource-only previews left the
-installed build 53 unchanged. Signed distribution and installation have their
-own verification record: preserve the previous bundle and its observation
-cohort before replacement, and keep the new build's observations separate.
-Neither icon previews nor bounded runtime checks establish 72-hour acceptance
-or permit promoting a stable update feed while other release gates remain open.
+Repeat with Dark or Mono for their previews. Website SVG reuses these same four
+vectors as a flat brand rendition; native glass remains system-rendered.
+
+RC5 is a preview, not stable promotion. Preserve signed build54 and its complete
+observation cohort before installation. Build55 observations are separate; icon
+previews, fixture checks and older mail latency samples do not establish its
+natural72-hour acceptance or complete Google review/clean-Mac onboarding.
 
 References: [Icon Composer](https://developer.apple.com/icon-composer/) and
 [Creating your app icon](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer).

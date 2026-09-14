@@ -3,31 +3,78 @@
     "refractivity"
   ],
   "fill": {
-    "automatic-gradient": "extended-srgb:0.04000,0.44000,0.97000,1.00000"
+    "automatic-gradient": "extended-srgb:0.79000,0.80500,0.73000,1.00000"
   },
   "groups": [
     {
-      "blur-material": 0.0,
+      "name": "Head above lens",
       "layers": [
         {
-          "image-name": "Emblem.svg",
-          "name": "Portrait and ring"
+          "image-name": "Head.svg",
+          "name": "Head",
+          "glass": false
         }
       ],
-      "refractivity": {
-        "enabled": true,
-        "depth": 0.05,
-        "strength": 0.16
-      },
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.25
+        "opacity": 0.5
       },
       "translucency": {
         "enabled": true,
-        "value": 0.1
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Gray circular glass",
+      "blend-mode": "multiply",
+      "layers": [
+        {
+          "image-name": "Lens.svg",
+          "name": "Circular glass",
+          "opacity": 0.8
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "name": "Emblem"
+      "refractivity": {
+        "enabled": true,
+        "strength": 0.86,
+        "depth": 0.26
+      }
+    },
+    {
+      "name": "Body below lens",
+      "layers": [
+        {
+          "image-name": "Body.svg",
+          "name": "Body",
+          "glass": false
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.0
+      }
+    },
+    {
+      "name": "Recess beneath body",
+      "layers": [
+        {
+          "image-name": "Well.svg",
+          "name": "Recess",
+          "glass": false,
+          "opacity": 0.65
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.0
+      }
     }
   ],
   "supported-platforms": {

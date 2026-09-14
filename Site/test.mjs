@@ -28,8 +28,17 @@ for(const phrase of ['gmail.metadata','Limited Use','Keychain','not anonymous','
 console.log('PASS links, privacy disclosures, redirects, 404, method boundary and no embedded credentials');
 
 const feed=await (await worker.fetch(new Request(origin+'/appcast.xml'))).text();assert.match(feed,/sparkle-signatures:/);assert.match(feed,/<channel>/);
-const appGlyph=await readFile(new URL('../Resources/AppIcon.icon/Assets/Emblem.svg',import.meta.url),'utf8');
 const siteIcon=await (await worker.fetch(new Request(origin+'/icon.svg'))).text();
-assert.equal(siteIcon.match(/ d="([^"]+)"/)[1],appGlyph.match(/ d="([^"]+)"/)[1]);
-assert.equal((siteIcon.match(/<path /g)||[]).length,1);
-console.log('PASS website reuses the app portrait-and-ring compound glyph');
+for(const asset of ['Head.svg','Body.svg']) {
+  const glyph=await readFile(new URL('../Resources/AppIcon.icon/Assets/'+asset,import.meta.url),'utf8');
+  assert.ok(siteIcon.includes(glyph.match(/ d="([^"]+)"/)[1]));
+}
+assert.equal((siteIcon.match(/<path /g)||[]).length,2);
+assert.match(siteIcon,/fill="#C9CDBA"/);
+assert.match(siteIcon,/mix-blend-mode:multiply/);
+assert.doesNotMatch(siteIcon,/#2b70f4|Emblem.svg/);
+const home=await (await worker.fetch(new Request(origin+'/'))).text();
+assert.match(home,/0.20.0 RC5 preview/);
+assert.match(home,/releases\/tag\/v0.20.0-rc.5/);
+assert.match(home,/releases\/download\/v0.19.0/);
+console.log('PASS approved four-vector branding, RC5 preview label and unchanged stable download');
