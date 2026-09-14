@@ -162,6 +162,11 @@ final class SnapshotTests: XCTestCase {
         window.orderBack(nil)
         defer { window.orderOut(nil) }
         for _ in 0..<8 { host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds:25_000_000) }
+        // SwiftUI installs MainView's toolbar asynchronously; macOS 26 keeps
+        // the outer window frame and takes its height from the content area.
+        // Restore the export canvas after that native chrome has been added.
+        window.setContentSize(size)
+        for _ in 0..<4 { host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds:25_000_000) }
         XCTAssertEqual(host.bounds.width,size.width,accuracy:1,name)
         XCTAssertEqual(host.bounds.height,size.height,accuracy:1,name)
         guard let bitmap=host.bitmapImageRepForCachingDisplay(in:host.bounds) else { return XCTFail("missing bitmap") }
