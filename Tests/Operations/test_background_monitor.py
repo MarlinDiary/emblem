@@ -3,6 +3,10 @@ from pathlib import Path
 SCRIPT=Path(__file__).resolve().parents[2]/'Scripts/monitor-background.py'
 spec=importlib.util.spec_from_file_location('monitor',SCRIPT);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class BackgroundMonitorTests(unittest.TestCase):
+ def testLaunchdRelativeNameAndNoShellFalsePositive(self):
+  self.assertEqual(m.process_role('Emblem --background-sync-agent'),'helper')
+  self.assertEqual(m.process_role('/Applications/Emblem.app/Contents/MacOS/Emblem --mail-scan-worker'),'worker')
+  self.assertIsNone(m.process_role('/bin/zsh -lc echo /Applications/Emblem.app/Contents/MacOS/Emblem'))
  def testShortWindowDoesNotClaimMultiDayAcceptance(self):
   with tempfile.TemporaryDirectory() as tmp:
    p=Path(tmp);out=p/'out'

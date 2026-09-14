@@ -11,6 +11,13 @@ def read(path):
     try: return json.loads(path.read_text())
     except (OSError, ValueError): return {}
 
+def process_role(cmd):
+    # launchd uses the relative argv[0] "Emblem", not the installed full path.
+    # Never match a shell command merely because its arguments mention that path.
+    exe=cmd.split(None,1)[0] if cmd else ''
+    if exe != 'Emblem' and not exe.endswith('/Emblem.app/Contents/MacOS/Emblem'):return None
+    return 'helper' if '--background-sync-agent' in cmd else 'worker' if '--mail-scan-worker' in cmd else 'foreground'
+
 def sample(root, now, online):
     accounts=read(root/'gmail.json').get('accounts',[])
     sync=read(root/'mail-sync.json')
@@ -33,9 +40,9 @@ def sample(root, now, online):
         output=subprocess.check_output(['ps','-ax','-o','pid=,%cpu=,rss=,command='],text=True)
         for line in output.splitlines():
             fields=line.strip().split(None,3)
-            if len(fields)!=4 or '/Emblem.app/Contents/MacOS/Emblem' not in fields[3]:continue
-            cmd=fields[3]
-            role='helper' if '--background-sync-agent' in cmd else 'worker' if '--mail-scan-worker' in cmd or '--scan-mail-worker' in cmd else 'foreground'
+            if len(fields)!=4:continue
+            role=process_role(fields[3])
+            if role is None:continue
             processes.append(dict(role=role,pid=int(fields[0]),cpu=float(fields[1]),rssMB=round(int(fields[2])/1024,2)))
     except (OSError,ValueError,subprocess.SubprocessError):pass
     try:boot=subprocess.check_output(['sysctl','-n','kern.boottime'],text=True).strip()
