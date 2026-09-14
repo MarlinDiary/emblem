@@ -55,6 +55,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
     var syncPassRunning=false
     var syncTask:Task<Void,Never>?
     var rowsRevision:UInt64=0
+    var contactMutationRunner:((ContactMutationRequest) async throws -> ContactMutationResponse)?
     var lastSavedRowsRevision:UInt64?
     var lastScanCheckpoint=Date.distantPast
     @Published var rows: [SenderRow] = [] { didSet { rowsRevision &+= 1; if !preserveVisibleGroupingOnRowsChange { invalidateVisibleGrouping() } } }

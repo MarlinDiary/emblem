@@ -27,6 +27,7 @@ import PortraitCore
             Task {exit(await BackgroundService.command(arguments:args))}
             RunLoop.main.run();exit(1)
         }
+        if args.contains("--contact-mutation-worker") {exit(ContactMutation.worker(arguments:args))}
         if args.contains("--mail-scan-worker") {exit(MailScanWorker.run())}
         EmblemApp.main()
     }

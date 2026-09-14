@@ -172,63 +172,35 @@ extension AppModel {
             // An honest local provisional avatar may sync immediately. A later
             // web result upgrades only our unchanged automatic photo, same card.
             do {
-                var link=mailSync.links.first{$0.key==key}
+                let link=mailSync.links.first{$0.key==key}
                 if let link, explicit == nil,link.desiredHash==digest(candidate.png),
                    (!link.createdByApp || link.externalEmails == true || members.allSatisfy({row in link.emails.contains{$0.caseInsensitiveCompare(row.id) == .orderedSame}})) {
                     if !records.contains(where:{$0.contactID==link.contactID && $0.state == .prepared}) {for i in memberIndices where rows[i].applicationIssue != nil {rows[i].applicationIssue=nil}}
                     continue
                 }
-                if link == nil {
-                    let matches=try members.flatMap {try port.matches(email:$0.id)}
-                    let unique=Dictionary(matches.map{($0.id,$0)},uniquingKeysWith: {a,_ in a})
-                    guard unique.count<=1 else{throw PortraitError.message("These addresses belong to different contacts and remain separate.")}
-                    if let contact=unique.values.first {
-                        let created=try engine.records().contains{$0.contactID==contact.id && $0.created && $0.state == .applied}
-                        link=MailSyncLink(key:key,contactID:contact.id,emails:Set(contact.emails),createdByApp:created,imageHash:digest(contact.image),desiredHash:digest(candidate.png),externalPhoto:contact.image != nil)
-                        // Existing photos stay untouched until a deliberate new selection.
-                        if contact.image == nil || (explicit != nil && digest(contact.image) != digest(candidate.png)) {
-                            // The first/newest alias may not yet be on this legacy card.
-                            // Verify the photo write against the exact email that matched it.
-                            guard let matched=members.first(where:{row in contact.emails.contains{$0.caseInsensitiveCompare(row.id) == .orderedSame}}) else{throw PortraitError.message("The email link changed. The original contact is retained.")}
-                            _=try engine.replaceSyncedImage(contactID:contact.id,email:matched.id,expectedHash:digest(contact.image),candidate:candidate)
-                            if let fresh=try port.get(id:contact.id){link?.imageHash=digest(fresh.image);link?.externalPhoto=false}
-                        }
-                    } else {
-                        let record:ChangeRecord
-                        if members.count>1 {record=try engine.applyGroup(emails:members.map(\.email),name:SharedSenderIdentity.contactName(email:representative.email,displayName:representative.name),candidate:candidate,allowCreate:true,managedKey:nil)}
-                        else {record=try engine.apply(email:representative.email,name:SharedSenderIdentity.contactName(email:representative.email,displayName:representative.name),candidate:candidate,allowCreate:true)}
-                        guard let id=record.contactID,let contact=try port.get(id:id) else{throw PortraitError.message("The new contact could not be verified.")}
-                        link=MailSyncLink(key:key,contactID:id,emails:Set(contact.emails),createdByApp:true,imageHash:digest(contact.image),desiredHash:digest(candidate.png))
-                    }
-                } else if var currentLink=link,let contact=try port.get(id:currentLink.contactID) {
-                    // Only app-created brand cards receive additional rotating aliases.
-                    if currentLink.createdByApp && currentLink.externalEmails != true {
-                        let additions=members.filter{row in !currentLink.emails.contains{$0.caseInsensitiveCompare(row.id) == .orderedSame}}
-                        if !additions.isEmpty {
-                            guard try additions.allSatisfy({try port.matches(email:$0.id).allSatisfy{$0.id==contact.id}}) else{throw PortraitError.message("This new address already belongs to another contact. The existing link is preserved.")}
-                            _=try engine.appendManagedAliases(contactID:contact.id,emails:additions.map(\.email),managedKey:key)
-                            currentLink.emails.formUnion(additions.map(\.id))
-                        }
-                    }
-                    if currentLink.desiredHash != digest(candidate.png) || explicit != nil {
-                        if digest(contact.image) != digest(candidate.png) && (explicit != nil || (!currentLink.externalPhoto && digest(contact.image)==currentLink.imageHash)) {
-                            _=try engine.replaceSyncedImage(contactID:contact.id,email:representative.id,expectedHash:digest(contact.image),candidate:candidate)
-                            currentLink.imageHash=digest(try port.get(id:contact.id)?.image);currentLink.externalPhoto=false
-                        }
-                        currentLink.desiredHash=digest(candidate.png)
-                    }
-                    link=currentLink
-                }
-                if let link {
-                    var link=link;link.imagePixelHash=photoPixelHash(try port.get(id:link.contactID)?.image)
+                let request=ContactMutationRequest(kind:.sync,members:members,representativeID:representative.id,key:key,explicit:explicit,link:link)
+                let startedRevision=rowsRevision
+                let response:ContactMutationResponse
+                if let runner=contactMutationRunner {response=try await runner(request)}
+                else if port is AppleContacts {response=try await ContactMutation.run(request,root:root)}
+                else {response=try ContactMutation.perform(request,port:port,engine:engine)}
+                let externallyChanged=rowsRevision != startedRevision
+                if let link=response.link {
                     mailSync.links.removeAll{$0.key==key};mailSync.links.append(link)
-                    mailSync.enrolled.formUnion(members.map(\.id));mailSync.explicitChoices.removeValue(forKey:key)
-                    let contact=try port.get(id:link.contactID)
-                    for i in memberIndices {rows[i].current=contact;rows[i].completed=true;rows[i].applicationIssue=nil}
+                    mailSync.enrolled.formUnion(members.map(\.id))
+                    // Selection or ignore may change while the IPC worker is awaiting
+                    // the OS. Persist the completed write, but retain a newer choice.
+                    if mailSync.explicitChoices[key]==explicit && rows.first(where:{$0.id==representative.id})?.chosen?.id==candidate.id {mailSync.explicitChoices.removeValue(forKey:key)}
+                    let memberIDs=Set(members.map(\.id))
+                    for i in rows.indices where memberIDs.contains(rows[i].id) {rows[i].current=response.contact;rows[i].completed=true;rows[i].applicationIssue=nil}
                     try saveMailSync();records=try engine.records()
                 }
                 processed+=1
-            } catch {for i in memberIndices where rows[i].applicationIssue != error.localizedDescription {rows[i].applicationIssue=error.localizedDescription}}
+                if externallyChanged {break}
+            } catch {
+                let memberIDs=Set(members.map(\.id))
+                for i in rows.indices where memberIDs.contains(rows[i].id) && rows[i].applicationIssue != error.localizedDescription {rows[i].applicationIssue=error.localizedDescription}
+            }
             expectedRowsRevision=rowsRevision
             await Task.yield()
         }
@@ -270,7 +242,8 @@ extension AppModel {
     }
     func ignoreSyncedSenders(_ ids:Set<String>) async throws {
         guard !busy else{return}
-        syncTask?.cancel();busy=true;defer{busy=false}
+        let pending=syncTask;pending?.cancel();busy=true;defer{busy=false}
+        if let pending {await pending.value}
         let keys=Set(rows.filter{ids.contains($0.id)}.map(MailSyncIdentity.key))
         // Persist suppression before touching Contacts; failures cannot resurrect cards.
         mailSync.suppressedKeys.formUnion(keys)
@@ -289,10 +262,15 @@ extension AppModel {
                 // Never remove a pre-existing user card. Our own photo-only edits may be undone.
                 var preserved=false
                 for record in history.reversed() {
-                    do {try engine.undo(id:record.id)}
+                    do {
+                        if port is AppleContacts {_=try await ContactMutation.run(.init(kind:.undo,recordID:record.id),root:root)}
+                        else {try engine.undo(id:record.id)}
+                    }
                     catch is UndoProtection {preserved=true;break}
                 }
-                let after=try port.get(id:targetID)
+                let after:ContactSnapshot?
+                if port is AppleContacts {after=try await CancellableContactRead.snapshots(ids:[targetID])[targetID]}
+                else {after=try port.get(id:targetID)}
                 if after == nil {removed += 1} else {kept += 1;if preserved {protected += 1}}
                 mailSync.links.removeAll{$0.key==key}
                 for i in rows.indices where MailSyncIdentity.key(rows[i])==key {rows[i].current=after;rows[i].completed=false}
