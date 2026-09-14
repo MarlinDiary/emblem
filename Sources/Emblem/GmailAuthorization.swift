@@ -81,12 +81,12 @@ enum GmailKeychain {
         if let listenerError {throw listenerError}
         handler=listener
         defer {timeout?.cancel();timeout=nil;listener.cancelHTTPListener();handler=nil}
-        guard let presentingWindow=NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first else {
+        guard (NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first) != nil else {
             throw PortraitError.message("Open the Emblem window before connecting Gmail.")
         }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                listener.currentAuthorizationFlow=OIDAuthState.authState(byPresenting:Self.request(client:client,redirect:redirect),presenting:presentingWindow) { state,error in
+                listener.currentAuthorizationFlow=OIDAuthState.authState(byPresenting:Self.request(client:client,redirect:redirect),externalUserAgent:GmailBrowserAgent()) { state,error in
                     Task { @MainActor in
                         let granted=Set((state?.scope ?? "").split(separator:" ").map(String.init))
                         if let state,state.isAuthorized,Set(Self.identityScopes).isSubset(of:granted) {
