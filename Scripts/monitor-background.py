@@ -3,7 +3,7 @@
 mail bodies, address-book contents or history identifiers into the evidence log.
 Run under a temporary user LaunchAgent to observe natural sleep/login/reboots.
 """
-import argparse, datetime, hashlib, json, math, os, plistlib, statistics, subprocess, time, urllib.request
+import argparse, datetime, hashlib, json, math, os, plistlib, statistics, subprocess, time
 from pathlib import Path
 OFFSET = 978307200
 
@@ -93,7 +93,11 @@ def main():
         if args.offline_fixture:online=False
         elif now>=next_network:
             try:
-                with urllib.request.urlopen('https://push.emblem.protoyard.com/ready',timeout=5) as r:online=r.status==200
+                # Match the working native network route without changing proxy
+                # configuration. urllib can take a different environment proxy.
+                probe=subprocess.run(['curl','--silent','--show-error','--max-time','5','--output','/dev/null','--write-out','%{http_code}',
+                                      'https://push.emblem.protoyard.com/ready'],capture_output=True,text=True)
+                online=probe.returncode==0 and probe.stdout.strip().isdigit() and int(probe.stdout.strip())>=100
             except Exception:online=False
             next_network=now+300
         points.append(sample(args.root,now,online))
