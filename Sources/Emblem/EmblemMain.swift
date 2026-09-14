@@ -19,15 +19,21 @@ import PortraitCore
                 exit(0)
             } catch {print("HEADLESS_FIXTURE_ERROR=\(error)");exit(1)}
         }
-        if args.contains("--background-sync-agent") {
-            Task {exit(await BackgroundSyncAgent.run(arguments:args))}
-            RunLoop.main.run();exit(1)
+        if args.contains("--background-sync-agent") || args.contains("--agent-application-fixture") {
+            AgentApplication.run(arguments:args)
         }
         if args.contains("--background-service-status") || args.contains("--unregister-background-service") {
             Task {exit(await BackgroundService.command(arguments:args))}
             RunLoop.main.run();exit(1)
         }
-        if args.contains("--contact-mutation-worker") {exit(ContactMutation.worker(arguments:args))}
+        if args.contains("--contact-mutation-worker") {
+            if args.contains("--contact-mutation-fixture") {exit(ContactMutation.worker(arguments:args))}
+            // Initialize native session services without any window, Dock or
+            // SwiftUI updater. Contacts IPC executes in this disposable child.
+            NSApplication.shared.setActivationPolicy(.prohibited)
+            Task {exit(ContactMutation.worker(arguments:args))}
+            NSApplication.shared.run();exit(1)
+        }
         if args.contains("--mail-scan-worker") {exit(MailScanWorker.run())}
         EmblemApp.main()
     }

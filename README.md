@@ -63,7 +63,7 @@ The visible app checks an Ed25519-signed update feed with Sparkle. Disable autom
 
 ## Public Gmail readiness
 
-Public Google verification and clean-Mac OAuth onboarding are separate release gates. Current source builds request a complete Desktop OAuth JSON before sign-in when Keychain setup is missing. An existing authorized account is not proof of public approval. See [Google verification](docs/google-verification.md) and [release acceptance](docs/acceptance-0.20.md).
+Public Google verification and clean-Mac OAuth onboarding are separate release gates. Official packages can include complete public Desktop application configuration; source builds without it request a Desktop OAuth JSON before sign-in. An existing authorized account is not proof of public approval. See [Google verification](docs/google-verification.md) and [release acceptance](docs/acceptance-0.20.md).
 
 ## Requirements
 
@@ -99,12 +99,14 @@ For a source build:
 2. Open Emblem → Settings → General → **Connect Gmail…**.
 3. Choose the downloaded desktop client JSON once, then finish consent in the system browser.
 
-The imported client configuration and account authorization are stored in the macOS Keychain, not the sender library. Maintainers can bundle a public client identifier at build time:
+Imported client configuration and private account authorization are stored in the macOS Keychain, not the sender library. Official packages can include Google’s public **installed-application** configuration at build time; this never includes user access/refresh tokens, Apple passwords or service-account keys:
 
 ```sh
-EMBLEM_GOOGLE_CLIENT_ID='YOUR_CLIENT_ID.apps.googleusercontent.com' \
+EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE='/absolute/path/to/desktop-client.json' \
   bash Scripts/build-app.sh
 ```
+
+Google describes installed-app client configuration as [public, embedded application configuration](https://developers.google.com/identity/protocols/oauth2#installed-applications), not confidential user authorization. PKCE and browser consent remain required. The build validates Desktop type and rejects tokens and service-account configurations.
 
 A broadly distributed OAuth client must satisfy Google's consent-screen and restricted-scope requirements. Testing-mode grants may have shorter lifetimes.
 

@@ -37,9 +37,12 @@ The UI and Push socket actor remain free. Launched writes are drained on caller
 cancellation; ignore waits for the prior write before undoing it. Later manual
 choices and new mail received during an IPC await retain their correct row IDs.
 Fixture subprocess cancellation, identity conflict, same-card upgrade, protected
-undo and late-selection regressions pass. Local Swift: 423 total, 12 deliberately
-private opt-in skips, 411 passing and zero failures. Final installed build 48's
-real response/photo measurements remain a separate gate below.
+undo and late-selection regressions pass. Final source and installed-version results are recorded in the release verification artifact; earlier counts must not be relabelled as final acceptance.
+
+The resident helper now runs as an accessory AppKit application: no Dock/window
+at startup, and explicit user reopen launches or activates one foreground app.
+Contacts IPC has its own prohibited-policy AppKit session, never SwiftUI/updater.
+Public installed-app OAuth configuration is bundled without user credentials.
 
 ## Release gates still requiring their own evidence
 
@@ -47,7 +50,7 @@ real response/photo measurements remain a separate gate below.
 - Full 72-hour natural background run, automatic daily Watch renewal, natural
   sleep/wake/offline/reboot events and sustained CPU/RSS thresholds. A monitor
   measures these without forcing the user's Mac to reboot or sleep.
-- Real full-app Sparkle download/install/relaunch and login-agent read-back.
+- Full native Sparkle 45 → 46, exact archive and registered login-agent read-back **passed**. Final later-version replacement is recorded separately.
 - Final installed version's real mail-to-hint/history and first-photo-to-Contacts
   measurements. Prior version's measurements must not be relabelled as current.
 

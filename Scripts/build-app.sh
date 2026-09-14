@@ -51,6 +51,9 @@ if [[ -n "${EMBLEM_GOOGLE_CLIENT_ID:-}" ]]; then
   [[ "$EMBLEM_GOOGLE_CLIENT_ID" == *.apps.googleusercontent.com ]] || exit 4
   plutil -insert EmblemGoogleClientID -string "$EMBLEM_GOOGLE_CLIENT_ID" "$APP/Contents/Info.plist"
 fi
+if [[ -n "${EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE:-}" ]]; then
+  python3 "$ROOT/Scripts/apply-native-oauth-config.py" "$EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE" "$APP/Contents/Info.plist"
+fi
 # Push is an all-or-nothing build configuration; a partially configured app
 # remains an ordinary Gmail client rather than advertising instant updates.
 if [[ -n "${EMBLEM_GMAIL_PUSH_ENDPOINT:-}${EMBLEM_GMAIL_PUBSUB_TOPIC:-}${EMBLEM_GOOGLE_PROJECT_NUMBER:-}" ]]; then

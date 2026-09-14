@@ -32,7 +32,7 @@ identifier. Explain this transfer accurately in the verification application.
 ## Architecture to disclose
 
 1. Desktop OAuth uses AppAuth, state and PKCE, with a random loopback port.
-2. Client configuration and account authorization remain in macOS Keychain.
+2. The signed app bundles public installed-app client configuration; private account authorization remains in macOS Keychain.
 3. The Mac queries Gmail directly; Gmail tokens and mailbox contents do not go
    to Emblem's relay.
 4. Google publishes email/history hints to the configured Pub/Sub topic.
@@ -56,14 +56,17 @@ or real personal contact lists in the recording.
 A screenshot of "Authorization complete" proves only a loopback callback, not
 successful token exchange, watch registration or public verification.
 
-## Fresh-user limitation found and corrected
+## Fresh-user configuration
 
-A token endpoint probe with the public desktop client ID and an intentionally
-invalid fixture code returned HTTP 400, `client_secret is missing.` The app now
-requests the full Desktop client JSON **before** starting sign-in when its
-Keychain configuration is incomplete. It does not bundle or publish the secret.
-Source builders must use their own project's full Desktop configuration. This
-preflight improvement is not a completed fresh-Mac public onboarding test.
+A public-ID-only token endpoint probe returned HTTP 400, `client_secret is missing`.
+Google’s [installed-application documentation](https://developers.google.com/identity/protocols/oauth2#installed-applications)
+explicitly treats native client configuration, including this client_secret field,
+as public embedded application configuration. The signed package now includes
+that complete Desktop configuration, not personal access/refresh tokens, service
+keys or Apple credentials. Source builds may import their own Desktop JSON;
+partial configurations still trigger setup before browser sign-in. Matching
+complete imported configuration is preserved. This removes the missing-config
+software issue, not Google’s review warning or the clean-Mac acceptance gate.
 
 Sources: [Gmail scopes](https://developers.google.com/workspace/gmail/api/auth/scopes),
 [restricted-scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification),
