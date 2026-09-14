@@ -140,6 +140,7 @@ struct MainView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .portraitScrollTop()
         .safeAreaInset(edge:.bottom,spacing:0) {
             if !model.lastIgnoredIDs.isEmpty {
                 HStack {Text(model.ignoreSummary ?? "Ignored").foregroundStyle(.secondary);Spacer();Button("Undo") {model.restoreIgnored(model.lastIgnoredIDs)}}.font(.callout).padding(12)

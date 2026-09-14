@@ -30,7 +30,7 @@ struct SenderList: View {
                     Spacer()
                 }.controlSize(.small).padding(12)
             }
-        }.background {SidebarMaterial().ignoresSafeArea(edges:.top)}
+        }.portraitScrollTop().background {SidebarMaterial().ignoresSafeArea(edges:.top)}
     }
     private var emptyDescription: String {
         switch model.section {
@@ -88,6 +88,7 @@ struct SenderDetail: View {
             }.frame(maxWidth: 560, alignment: .leading).padding(24).frame(maxWidth: .infinity, alignment: .top)
         }
         .scrollClipDisabled()
+        .portraitScrollTop()
         .safeAreaInset(edge: .bottom) { if row.ignored { actions.padding(.horizontal, 24).padding(.vertical, 16) } }
     }
     private var identity: some View {
@@ -103,7 +104,7 @@ struct SenderDetail: View {
                                 VStack(alignment:.leading,spacing:12) {
                                     ForEach(group.members) { Text($0.email.value).textSelection(.enabled) }
                                 }.font(.callout).padding(20)
-                            }.frame(width:340,height:min(320,CGFloat(group.members.count)*32+40))
+                            }.portraitScrollTop().frame(width:340,height:min(320,CGFloat(group.members.count)*32+40))
                         }
                 } else { Text(row.email.value).font(.callout).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled) }
 

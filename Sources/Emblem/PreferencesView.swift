@@ -46,7 +46,7 @@ struct PreferencesView: View {
                     if let issue=model.syncAttention {Text(issue).font(.caption).foregroundStyle(.orange)}
                 }
                 if let updates { UpdatePreferences(updates:updates) }
-            }.formStyle(.grouped).tabItem {Label("General",systemImage:"gearshape")}
+            }.formStyle(.grouped).portraitScrollTop().tabItem {Label("General",systemImage:"gearshape")}
             Form {
                 Section("Photo Sources") {
                     Toggle("Websites and public profiles",isOn:$model.useWebsite)
@@ -65,11 +65,11 @@ struct PreferencesView: View {
                     Text("Ignoring a sender stops sync and reverses this app’s changes when possible. Your original contacts and externally edited cards are preserved.").font(.caption).foregroundStyle(.secondary)
                 }
                 Section {Text("Emblem \(version) · Open source, MIT").font(.caption).foregroundStyle(.tertiary)}
-            }.formStyle(.grouped).tabItem {Label("Privacy",systemImage:"hand.raised")}
+            }.formStyle(.grouped).portraitScrollTop().tabItem {Label("Privacy",systemImage:"hand.raised")}
         }
         .sheet(isPresented:$model.showSyncSetup) {SyncSetupSheet(model:model)}
         .sheet(isPresented:$model.showHistoryTools) {
-            VStack {HSplitView {HistoryList(model:model).frame(width:230);HistoryDetail(model:model)};Button("Done") {model.showHistoryTools=false}.padding()}.frame(width:760,height:540)
+            VStack {HSplitView {HistoryList(model:model).frame(width:230);HistoryDetail(model:model)};Button("Done") {model.showHistoryTools=false}.padding()}.frame(width:760,height:540).portraitScrollTop()
                 .alert("Undo this change?",isPresented:Binding(get:{model.undoRecord != nil},set:{if !$0{model.undoRecord=nil}})) {
                     Button("Cancel",role:.cancel){model.undoRecord=nil}
                     Button("Undo",role:.destructive){if let r=model.undoRecord{model.undo(r)};model.undoRecord=nil}
@@ -98,7 +98,7 @@ struct HelpView:View {
                 help("Ignore or undo", "Ignore stops maintaining a sender and reverses this app’s changes when possible. Only unmodified cards created by this app are deleted. Use View → Show Ignored Senders to restore them, or Settings → Privacy → Undo Changes for history.")
                 Text("Photos help you recognize senders. They do not verify identity. Emblem is independent of Apple.").font(.caption).foregroundStyle(.secondary)
             }.padding(28)
-        }
+        }.portraitScrollTop()
     }
     private func help(_ title:String,_ body:String)->some View {VStack(alignment:.leading,spacing:6){Text(title).font(.headline);Text(body).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)}}
 }

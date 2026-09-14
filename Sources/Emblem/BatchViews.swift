@@ -50,7 +50,7 @@ struct BatchApplySheet: View {
                         }.padding(.top, 12)
                     }
                 }.padding(.horizontal, 2)
-            }.frame(height: 230)
+            }.portraitScrollTop().frame(height: 230)
             Text("Existing photos stay unchanged. Conflicts are skipped, and completed changes can be undone together.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
@@ -101,7 +101,7 @@ struct BatchIssuesSheet: View {
                     Text(issue.id).font(.callout.weight(.medium)).textSelection(.enabled)
                     Text(issue.reason).font(.caption).foregroundStyle(.secondary)
                 }.padding(.vertical, 6)
-            }.frame(height: 260)
+            }.portraitScrollTop().frame(height: 260)
             HStack {
                 Button("Check Contacts Again") { model.showBatchIssues = false; model.connectContacts() }.disabled(model.busy)
                 Spacer(); Button("Done") { model.showBatchIssues = false }.keyboardShortcut(.defaultAction) }
