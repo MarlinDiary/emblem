@@ -131,7 +131,10 @@ final class SnapshotTests: XCTestCase {
                     }
                 }}
                 let x0=try XCTUnwrap(xs.min()),x1=try XCTUnwrap(xs.max()),y0=try XCTUnwrap(ys.min()),y1=try XCTUnwrap(ys.max())
-                XCTAssertGreaterThanOrEqual(x0,10);XCTAssertGreaterThanOrEqual(y0,10)
+                // Compare logical padding, not assumed Retina pixels. Hosted
+                // CI renders at 1x; this Mac's WindowServer renders at 2x.
+                let scaleX=Double(bitmap.pixelsWide)/142,scaleY=Double(bitmap.pixelsHigh)/128
+                XCTAssertGreaterThanOrEqual(Double(x0),5*scaleX);XCTAssertGreaterThanOrEqual(Double(y0),5*scaleY)
                 XCTAssertEqual(Double(x0),Double(bitmap.pixelsWide-1-x1),accuracy:1,name)
                 XCTAssertEqual(Double(y0),Double(bitmap.pixelsHigh-1-y1),accuracy:1,name)
             }
