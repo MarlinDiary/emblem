@@ -298,7 +298,7 @@ extension AppModel {
             let snapshot=rows,revision=rowsRevision
             let data:Data
             if let encoder=rowsSnapshotEncoder {data=try await encoder(snapshot)}
-            else {data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value}
+            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot)}.value}
             try Task.checkCancellation()
             // The batch is already in this snapshot. Later unsaved avatar edits
             // remain dirty; they must not starve the mail cursor by restarting

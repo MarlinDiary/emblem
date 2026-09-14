@@ -304,7 +304,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
             // New/test-created rows already have their intended visible order.
             let top=nextDiscoveryOrder+rows.count
             for i in rows.indices where rows[i].discoveryOrder == nil {rows[i].discoveryOrder=top-i}
-            try JSONEncoder().encode(rows).write(to: stateURL, options: .atomic)
+            try RowsPersistence.encode(rows).write(to: stateURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stateURL.path)
             try clearInboxReceiptOverlay()
             lastSavedRowsRevision=rowsRevision

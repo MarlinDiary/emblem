@@ -1,6 +1,13 @@
 import Foundation
 import PortraitCore
 
+enum RowsPersistence {
+    static func encode(_ rows:[SenderRow])throws->Data {
+        let encoder=JSONEncoder();encoder.outputFormatting=[.withoutEscapingSlashes]
+        return try encoder.encode(rows)
+    }
+}
+
 extension AppModel {
     /// Await durability without making PNG/base64 serialization a main-thread
     /// operation. Newer durable user edits win; later unsaved edits stay dirty.
@@ -14,7 +21,7 @@ extension AppModel {
         do {
             let data:Data
             if let encoder=rowsSnapshotEncoder {data=try await encoder(snapshot)}
-            else {data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value}
+            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot)}.value}
             if let saved=lastSavedRowsRevision,saved>=revision {return}
             try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
             try data.write(to:stateURL,options:.atomic)

@@ -8,6 +8,19 @@ private actor PersistenceHistoryTransport:GmailHTTPTransport {
     }
 }
 final class RowsPersistenceTests:XCTestCase {
+    func testBase64HeavyRowsRemainBackwardCompatibleWithoutSlashExpansion()throws {
+        var row=SenderRow(email:EmailAddress("image@fixture.test")!,name:"Fixture")
+        let candidate=AvatarCandidate(source:.touchIcon,origin:"https://fixture.test/icon.png",width:256,height:256,png:Data(repeating:255,count:32_000))
+        row.candidates=[candidate];row.selectedCandidate=candidate.id
+        let rows=Array(repeating:row,count:32),start=Date()
+        let compact=try RowsPersistence.encode(rows),duration=Date().timeIntervalSince(start)
+        let old=try JSONEncoder().encode(rows)
+        let reopened=try JSONDecoder().decode([SenderRow].self,from:compact)
+        XCTAssertEqual(reopened.count,rows.count);XCTAssertEqual(reopened[0].chosen?.png,candidate.png)
+        XCTAssertLessThan(compact.count,old.count*3/5)
+        XCTAssertFalse(String(decoding:compact,as:UTF8.self).contains("\\/"))
+        print("ROW_BASE64_ENCODING_BYTES=\(compact.count) LEGACY_BYTES=\(old.count) SECONDS=\(duration) ROUND_TRIP=PASS")
+    }
     @MainActor func testNewMailRunsWhileContactsSnapshotIsBeingEncoded() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}

@@ -60,6 +60,7 @@ jobs:
           app="$PWD/runtime/Emblem.app"
           xcrun lipo -info "$app/Contents/MacOS/Emblem"
           codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/Emblem" --contact-worker-launch-fixture --data-dir "$RUNNER_TEMP/workspace-worker"
           "$app/Contents/MacOS/Emblem" --agent-application-fixture --data-dir "$RUNNER_TEMP/agent-fixture"
           "$app/Contents/MacOS/Emblem" --self-test --data-dir "$RUNNER_TEMP/emblem-runtime" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"

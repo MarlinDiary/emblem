@@ -34,6 +34,11 @@ import PortraitCore
             Task {exit(ContactMutation.worker(arguments:args))}
             NSApplication.shared.run();exit(1)
         }
+        if args.contains("--contact-worker-launch-fixture") {
+            NSApplication.shared.setActivationPolicy(.prohibited)
+            Task {exit(await ContactMutation.launchFixture(arguments:args))}
+            NSApplication.shared.run();exit(1)
+        }
         if args.contains("--mail-scan-worker") {exit(MailScanWorker.run())}
         EmblemApp.main()
     }

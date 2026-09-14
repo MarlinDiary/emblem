@@ -173,7 +173,7 @@ extension AppModel {
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         if lastSavedRowsRevision != rowsRevision && (force || Date().timeIntervalSince(lastScanCheckpoint)>=5) {
             let snapshot=rows,revision=rowsRevision
-            let data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value
+            let data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot)}.value
             if !force {try Task.checkCancellation()}
             if revision == rowsRevision {
                 try data.write(to:stateURL,options:.atomic)
@@ -188,7 +188,7 @@ extension AppModel {
     func persistScan() throws {
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         // Persist rows before the summary so a crash never claims more durable rows than exist.
-        try JSONEncoder().encode(rows).write(to:stateURL,options:.atomic)
+        try RowsPersistence.encode(rows).write(to:stateURL,options:.atomic)
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:stateURL.path)
         try clearInboxReceiptOverlay()
         if let scanReport {

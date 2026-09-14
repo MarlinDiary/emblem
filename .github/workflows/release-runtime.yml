@@ -40,6 +40,7 @@ jobs:
           codesign -dvv "$app" 2>&1 | grep '^TeamIdentifier=33G9D6C5H4$'
           xcrun stapler validate "$app"
           "$app/Contents/MacOS/Emblem" --headless-fixture
+          "$app/Contents/MacOS/Emblem" --contact-worker-launch-fixture --data-dir "$RUNNER_TEMP/workspace-worker"
           "$app/Contents/MacOS/Emblem" --agent-application-fixture --data-dir "$RUNNER_TEMP/agent-fixture"
           "$app/Contents/MacOS/Emblem" --self-test --data-dir "$RUNNER_TEMP/signed-fixtures" | tee "$RUNNER_TEMP/self-test.log"
           fixture="$(sed -n 's/^ROLLBACK_FIXTURE=//p' "$RUNNER_TEMP/self-test.log")"

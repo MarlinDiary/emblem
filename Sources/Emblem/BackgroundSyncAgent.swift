@@ -121,6 +121,10 @@ import PortraitCore
     }
 
     private static func perform(root:URL)async->Int32 {
+        // Only the bounded mail pass needs prompt execution; idle sockets do
+        // not hold an activity assertion or prevent natural system sleep.
+        let activity=ProcessInfo.processInfo.beginActivity(options:.userInitiatedAllowingIdleSystemSleep,reason:"Process newly received mail")
+        defer {ProcessInfo.processInfo.endActivity(activity)}
         guard CNContactStore.authorizationStatus(for:.contacts) == .authorized else {writeStatus("contacts-permission-required",root:root);return 0}
         let automation=try? JSONDecoder().decode(AutomationPreferences.self,from:Data(contentsOf:root.appendingPathComponent("automation.json")))
         let target=NSAppleEventDescriptor(descriptorType:typeApplicationBundleID,data:Data("com.apple.mail".utf8))

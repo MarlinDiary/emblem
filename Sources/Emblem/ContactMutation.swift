@@ -78,7 +78,18 @@ struct ContactMutationResponse: Codable, Sendable {
         return .init()
     }
 
-    static func run(_ request:ContactMutationRequest,root:URL,executable override:URL?=nil,fixture:Bool=false)async throws->ContactMutationResponse {
+    @MainActor private static func launch(arguments:[String])async throws->NSRunningApplication {
+        let configuration=NSWorkspace.OpenConfiguration()
+        configuration.arguments=arguments;configuration.activates=false
+        configuration.createsNewApplicationInstance=true
+        return try await withCheckedThrowingContinuation {continuation in
+            NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) {application,error in
+                if let application {continuation.resume(returning:application)}
+                else {continuation.resume(throwing:error ?? PortraitError.message("The Contacts worker did not start."))}
+            }
+        }
+    }
+    static func run(_ request:ContactMutationRequest,root:URL,executable override:URL?=nil,fixture:Bool=false,workspaceFixture:Bool=false)async throws->ContactMutationResponse {
         let executable=override ?? Bundle.main.executableURL ?? URL(fileURLWithPath:CommandLine.arguments[0]).standardizedFileURL
         let worker=Task.detached(priority:.userInitiated) {
             let directory=root.appendingPathComponent("contact-mutation-"+UUID().uuidString,isDirectory:true)
@@ -87,11 +98,18 @@ struct ContactMutationResponse: Codable, Sendable {
             let input=directory.appendingPathComponent("request.json"),output=directory.appendingPathComponent("response.json")
             try JSONEncoder().encode(request).write(to:input,options:.atomic)
             try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:input.path)
-            let process=Process();process.executableURL=executable
-            process.arguments=["--contact-mutation-worker","--data-dir",root.path,"--request",input.path,"--response",output.path]
-            if fixture {process.arguments?.append("--contact-mutation-fixture")}
-            process.standardOutput=FileHandle.nullDevice;process.standardError=FileHandle.nullDevice
-            try process.run();process.waitUntilExit()
+            var arguments=["--contact-mutation-worker","--data-dir",root.path,"--request",input.path,"--response",output.path]
+            if fixture {arguments.append("--contact-mutation-fixture")}
+            if !fixture || workspaceFixture {
+                // Give Contacts its normal LaunchServices/TCC application
+                // context. Direct launchd descendants stall native read-back.
+                let application=try await launch(arguments:arguments)
+                while !application.isTerminated {try? await Task.sleep(for:.milliseconds(50))}
+            } else {
+                let process=Process();process.executableURL=executable;process.arguments=arguments
+                process.standardOutput=FileHandle.nullDevice;process.standardError=FileHandle.nullDevice
+                try process.run();process.waitUntilExit()
+            }
             guard FileManager.default.fileExists(atPath:output.path) else {throw PortraitError.message("The Contacts worker stopped. Its write-ahead record is retained; review Contacts before retrying.")}
             return try JSONDecoder().decode(ContactMutationResponse.self,from:Data(contentsOf:output))
         }
@@ -105,6 +123,8 @@ struct ContactMutationResponse: Codable, Sendable {
     }
 
     static func worker(arguments:[String])->Int32 {
+        let activity=ProcessInfo.processInfo.beginActivity(options:.userInitiatedAllowingIdleSystemSleep,reason:"Finish requested Contacts synchronization")
+        defer {ProcessInfo.processInfo.endActivity(activity)}
         func path(_ flag:String)throws->URL {guard let i=arguments.firstIndex(of:flag),i+1<arguments.count else{throw PortraitError.message("Missing worker path.")};return URL(fileURLWithPath:arguments[i+1])}
         do {
             let root=try path("--data-dir"),input=try path("--request"),output=try path("--response")
@@ -136,5 +156,18 @@ struct ContactMutationResponse: Codable, Sendable {
             try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:output.path)
             return response.error == nil ? 0:1
         } catch {return 1}
+    }
+
+    static func launchFixture(arguments:[String])async->Int32 {
+        guard let i=arguments.firstIndex(of:"--data-dir"),i+1<arguments.count else{return 64}
+        let root=URL(fileURLWithPath:arguments[i+1],isDirectory:true)
+        guard root.standardizedFileURL != LibraryLease.liveRoot.standardizedFileURL,Bundle.main.bundleURL.pathExtension=="app" else{return 64}
+        do {
+            var row=SenderRow(email:EmailAddress("worker@fixture.org")!,name:"Worker Fixture")
+            let candidate=try NameAvatar.candidate(name:row.name);row.candidates=[candidate];row.selectedCandidate=candidate.id
+            let response=try await run(.init(kind:.sync,members:[row],representativeID:row.id,key:"fixture"),root:root,fixture:true,workspaceFixture:true)
+            guard response.contact?.image != nil,response.contact?.emails==[row.id],NSApp.windows.isEmpty else{return 1}
+            print("CONTACT_WORKER_LAUNCH=LaunchServices FIXTURE_PHOTO=PASS WINDOWS=0 REAL_CONTACTS_WRITES=0");return 0
+        } catch {print("CONTACT_WORKER_LAUNCH_FIXTURE=FAILED");return 1}
     }
 }
