@@ -54,9 +54,17 @@ enum GmailKeychain {
 @MainActor final class GmailAuthorization {
     private var handler:OIDRedirectHTTPHandler?
     private var timeout:Task<Void,Never>?
+    private var gate:GmailAuthorizationGate<OIDAuthState>?
     private var states:[String:OIDAuthState]=[:]
     static let clientKey="desktop-client"
     static let identityScopes=["openid","email",GmailAPI.scope]
+    static func hasRequiredScopes(_ scope:String?)->Bool {
+        // Google canonicalizes the OpenID `email` alias in token responses.
+        // Accept the equivalent scope, still requiring openid and gmail.metadata.
+        func canonical(_ value:String)->String {value == "email" ? "https://www.googleapis.com/auth/userinfo.email" : value}
+        let granted=Set((scope ?? "").split(separator:" ").map{canonical(String($0))})
+        return Set(identityScopes.map(canonical)).isSubset(of:granted)
+    }
     init() {
         let configuration=URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest=15;configuration.timeoutIntervalForResource=20
@@ -64,13 +72,19 @@ enum GmailKeychain {
         OIDURLSessionProvider.setSession(URLSession(configuration:configuration))
     }
     func configuredClient()throws->GmailOAuthClient? {
-        if let id=Bundle.main.object(forInfoDictionaryKey:"EmblemGoogleClientID") as? String,id.hasSuffix(".apps.googleusercontent.com") {return GmailOAuthClient(clientID:id)}
-        guard let data=try GmailKeychain.read(Self.clientKey) else{return nil}
-        return try JSONDecoder().decode(GmailOAuthClient.self,from:data)
+        let embedded=Bundle.main.object(forInfoDictionaryKey:"EmblemGoogleClientID") as? String
+        let stored=try GmailKeychain.read(Self.clientKey).map{try JSONDecoder().decode(GmailOAuthClient.self,from:$0)}
+        return Self.client(embeddedID:embedded,stored:stored)
+    }
+    static func client(embeddedID:String?,stored:GmailOAuthClient?)->GmailOAuthClient? {
+        guard let id=embeddedID,id.hasSuffix(".apps.googleusercontent.com") else{return stored}
+        // Preserve an imported desktop client's matching configuration. Never
+        // attach another OAuth client's secret to the embedded public client ID.
+        return stored?.clientID == id ? stored:GmailOAuthClient(clientID:id)
     }
     func importClient(_ data:Data)throws {try GmailKeychain.save(JSONEncoder().encode(GmailOAuthClient.parse(data)),account:Self.clientKey)}
     static func request(client:GmailOAuthClient,redirect:URL)->OIDAuthorizationRequest {
-        let configuration=OIDServiceConfiguration(authorizationEndpoint:URL(string:"https://accounts.google.com/o/oauth2/v2/auth")!,tokenEndpoint:URL(string:"https://oauth2.googleapis.com/token")!)
+        let configuration=OIDServiceConfiguration(authorizationEndpoint:URL(string:"https://accounts.google.com/o/oauth2/v2/auth")!,tokenEndpoint:URL(string:"https://oauth2.googleapis.com/token")!,issuer:URL(string:"https://accounts.google.com")!)
         return OIDAuthorizationRequest(configuration:configuration,clientId:client.clientID,clientSecret:client.clientSecret,scopes:identityScopes,redirectURL:redirect,responseType:OIDResponseTypeCode,additionalParameters:["access_type":"offline","prompt":"consent select_account"])
     }
     func authorize(client:GmailOAuthClient)async throws->OIDAuthState {
@@ -80,25 +94,31 @@ enum GmailKeychain {
         let redirect=listener.startHTTPListener(&listenerError,withPort:0)
         if let listenerError {throw listenerError}
         handler=listener
-        defer {timeout?.cancel();timeout=nil;listener.cancelHTTPListener();handler=nil}
+        let attemptID=UUID()
+        defer {timeout?.cancel();timeout=nil;listener.cancelHTTPListener();handler=nil;if gate?.id == attemptID {gate=nil}}
         guard (NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first) != nil else {
             throw PortraitError.message("Open the Emblem window before connecting Gmail.")
         }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
+                let attempt=GmailAuthorizationGate<OIDAuthState>(id:attemptID) {continuation.resume(with:$0)}
+                gate=attempt
                 listener.currentAuthorizationFlow=OIDAuthState.authState(byPresenting:Self.request(client:client,redirect:redirect),externalUserAgent:GmailBrowserAgent()) { state,error in
                     Task { @MainActor in
-                        let granted=Set((state?.scope ?? "").split(separator:" ").map(String.init))
-                        if let state,state.isAuthorized,Set(Self.identityScopes).isSubset(of:granted) {
-                            continuation.resume(returning:state)
+                        if let state,state.isAuthorized,Self.hasRequiredScopes(state.scope) {
+                            attempt.finish(.success(state))
                         } else if (error as NSError?)?.code == OIDErrorCode.userCanceledAuthorizationFlow.rawValue {
-                            continuation.resume(throwing:CancellationError())
-                        } else {continuation.resume(throwing:PortraitError.message("Gmail sign-in did not finish. Check the Google consent screen and try again."))}
+                            attempt.finish(.failure(CancellationError()))
+                        } else {attempt.finish(.failure(PortraitError.message("Gmail sign-in did not finish. Check the Google consent screen and try again.")))}
                     }
                 }
-                timeout=Task {try? await Task.sleep(for:.seconds(180));guard !Task.isCancelled else{return};await listener.currentAuthorizationFlow?.cancel()}
+                timeout=Task {
+                    try? await Task.sleep(for:.seconds(600));guard !Task.isCancelled else{return}
+                    attempt.finish(.failure(PortraitError.message("Google sign-in timed out. Please reconnect.")))
+                    await listener.currentAuthorizationFlow?.cancel();listener.cancelHTTPListener()
+                }
             }
-        } onCancel: { Task { @MainActor in await listener.currentAuthorizationFlow?.cancel() } }
+        } onCancel: { Task { @MainActor in self.cancel(attemptID:attemptID) } }
     }
     func save(_ state:OIDAuthState,accountID:String)throws {
         let data=try NSKeyedArchiver.archivedData(withRootObject:state,requiringSecureCoding:true)
@@ -107,6 +127,12 @@ enum GmailKeychain {
     func token(accountID:String)async throws->String {
         let pair=try await tokens(accountID:accountID)
         return pair.accessToken
+    }
+    func statusMetadata(accountID:String)throws->[String:Bool] {
+        let state=try loadState(accountID:accountID)
+        return ["authorized":state.isAuthorized,"requiredScopesGranted":Self.hasRequiredScopes(state.scope),
+                "idTokenPresent":state.lastTokenResponse?.idToken != nil,
+                "clientSecretPresent":state.lastAuthorizationResponse.request.clientSecret != nil]
     }
     func tokens(accountID:String,forceRefresh:Bool=false)async throws->GmailOAuthTokens {
         let state=try loadState(accountID:accountID)
@@ -134,5 +160,9 @@ enum GmailKeychain {
         }
     }
     func forget(accountID:String)throws {try GmailKeychain.delete(accountID);try GmailPushCredentials.delete(accountID:accountID);states.removeValue(forKey:accountID)}
-    func cancel(){handler?.currentAuthorizationFlow?.cancel()}
+    func cancel(attemptID:UUID?=nil) {
+        guard attemptID == nil || gate?.id == attemptID else{return}
+        gate?.finish(.failure(CancellationError()))
+        handler?.currentAuthorizationFlow?.cancel();handler?.cancelHTTPListener()
+    }
 }
