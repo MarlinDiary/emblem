@@ -316,3 +316,20 @@ extension GmailPushTests {
         XCTAssertTrue(source.contains("var lastFallback=Date.distantPast"))
     }
 }
+
+extension GmailPushTests {
+    @MainActor func testRestartReplaysPersistedPushThatWasNotYetChecked() async throws {
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:directory)}
+        let model=fixtureModel(root:directory),now=Date()
+        var push=healthyPush(now:now);push.lastPush=now.addingTimeInterval(-1)
+        model.gmail.accounts=[GmailAccount(id:"account",email:"fixture@gmail.com",cursor:.init(historyID:"100",lastCheck:now.addingTimeInterval(-10),sentBootstrapComplete:true),push:push)]
+        let transport=GmailPushTransportFixture([root+"history":[(200,#"{"historyId":"101"}"#)]])
+        model.gmailAPI=GmailAPI(transport:transport);model.kickGmailSync(now:now)
+        if let task=model.gmailSyncTask {await task.value}
+        let requests=await transport.requests
+        XCTAssertEqual(requests.count,1,"A consumed hint must survive a helper restart before its history check finishes")
+        XCTAssertEqual(model.gmail.accounts[0].cursor.historyID,"101")
+        model.syncTask?.cancel();if let task=model.syncTask {await task.value}
+    }
+}

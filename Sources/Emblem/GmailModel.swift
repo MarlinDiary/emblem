@@ -98,7 +98,8 @@ extension AppModel {
             guard (account.cursor.retryAfter ?? .distantPast)<=now else{return nil}
             let paginating=account.cursor.pageToken != nil || account.cursor.historyPageToken != nil || (account.cursor.sentBootstrapComplete != true && (account.cursor.sentRetryAfter ?? .distantPast)<=now)
             let interval=paginating ? 0.0:(account.pushIsHealthy(at:now) ? 900.0:60.0)
-            return scheduledForced.contains(account.id) || now.timeIntervalSince(account.cursor.lastCheck ?? .distantPast)>=interval ? account.id:nil
+            let pendingPush=(account.push?.lastPush ?? .distantPast)>(account.cursor.lastCheck ?? .distantPast)
+            return scheduledForced.contains(account.id) || pendingPush || now.timeIntervalSince(account.cursor.lastCheck ?? .distantPast)>=interval ? account.id:nil
         })
         guard backgroundWorkAllowed,!isShuttingDown,!demo,automation.setupComplete,automaticEnabled,
               !gmail.accounts.isEmpty,gmailSyncTask==nil,!gmailConnecting,launchError==nil,!busy,
@@ -296,7 +297,7 @@ extension AppModel {
             try Task.checkCancellation()
             let snapshot=rows,revision=rowsRevision
             let data:Data
-            if let encoder=gmailRowsEncoder {data=try await encoder(snapshot)}
+            if let encoder=rowsSnapshotEncoder {data=try await encoder(snapshot)}
             else {data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value}
             try Task.checkCancellation()
             // The batch is already in this snapshot. Later unsaved avatar edits

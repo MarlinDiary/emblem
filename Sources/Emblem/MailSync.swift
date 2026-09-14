@@ -119,6 +119,12 @@ extension AppModel {
     }
     func performMailSync(limit:Int=20) async throws {
         guard mailSync.enabled,launchError == nil,!busy,!isScanning,!syncPassRunning else{return}
+        do {try await performMailSyncPass(limit:limit)}
+        catch {try? await saveAsync();throw error}
+        try await saveAsync()
+    }
+    private func performMailSyncPass(limit:Int) async throws {
+        guard mailSync.enabled,launchError == nil,!busy,!isScanning,!syncPassRunning else{return}
         syncPassRunning=true;defer{syncPassRunning=false}
         if let live=port as? AppleContacts {try live.requireFullAccess()}
         try await prepareSyncPhotoEvidence()
@@ -136,7 +142,6 @@ extension AppModel {
         } else {native=nil}
         try Task.checkCancellation()
         guard mailSync.enabled,!busy,!isScanning else{return}
-        let initialRevision=visibleGroupingRevision
         let rowIndex=Dictionary(grouping:rows.indices,by:{MailSyncIdentity.key(rows[$0])})
         if !contactsUnchanged {try reconcileMailSync(rowIndex:rowIndex,nativeSnapshots:native)}
         defer {
@@ -147,7 +152,6 @@ extension AppModel {
                     try? saveMailSync()
                 }
             }
-            if visibleGroupingRevision != initialRevision {save()}
         }
         try repairSharedSenderNames()
         let eligible=rows.filter{ $0.syncEligible != false && !$0.ignored && !mailSync.suppressedKeys.contains(MailSyncIdentity.key($0)) && (!mailSync.excludedAtEnable.contains($0.id) || mailSync.enrolled.contains($0.id)) }
@@ -262,7 +266,7 @@ extension AppModel {
                 for j in rowIndex[link.key] ?? [] {rows[j].ignored=true;rows[j].current=nil;rows[j].completed=false}
             }
         }
-        if changed {try saveMailSync();save()}
+        if changed {try saveMailSync()}
     }
     func ignoreSyncedSenders(_ ids:Set<String>) async throws {
         guard !busy else{return}

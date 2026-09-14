@@ -18,7 +18,7 @@ final class GmailPersistenceTests: XCTestCase {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}
         let model=model(root);var encodes=0
-        model.gmailRowsEncoder={snapshot in
+        model.rowsSnapshotEncoder={snapshot in
             encodes+=1
             if encodes>3 {throw NSError(domain:"SnapshotRetryStarvation",code:1)}
             model.rows[0].status="Avatar update \(encodes)"
@@ -39,7 +39,7 @@ final class GmailPersistenceTests: XCTestCase {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}
         let model=model(root);var encodes=0
-        model.gmailRowsEncoder={snapshot in
+        model.rowsSnapshotEncoder={snapshot in
             encodes+=1
             if encodes>3 {throw NSError(domain:"SnapshotRetryStarvation",code:2)}
             model.rows[0].name="User Chosen Name";model.save()
@@ -56,7 +56,7 @@ final class GmailPersistenceTests: XCTestCase {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}
         let model=model(root)
-        model.gmailRowsEncoder={_ in throw NSError(domain:"ControlledDiskFailure",code:1)}
+        model.rowsSnapshotEncoder={_ in throw NSError(domain:"ControlledDiskFailure",code:1)}
         do {try await model.ingestGmail(batch(),accountID:"fixture");XCTFail("The persistence failure was hidden")}
         catch {XCTAssertEqual(model.gmail.accounts[0].cursor.historyID,"100")}
     }
@@ -77,7 +77,7 @@ final class GmailPersistenceTests: XCTestCase {
         defer {try? FileManager.default.removeItem(at:root)}
         let model=model(root),receipt=Date(timeIntervalSince1970:1_789_350_000)
         model.rows=[SenderRow(email:EmailAddress("other@fixture.test")!,name:"Other")];model.save()
-        model.gmailRowsEncoder={snapshot in
+        model.rowsSnapshotEncoder={snapshot in
             let i=model.rows.firstIndex(where:{$0.id=="other@fixture.test"})!
             model.rows[i].lastInboxReceivedAt=receipt
             try model.persistInboxReceiptOverlay(ids:["other@fixture.test"])

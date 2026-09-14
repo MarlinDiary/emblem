@@ -284,7 +284,11 @@ extension AppModel {
     }
     func automaticallyResolve(now: Date) async throws {
         guard useWebsite || useGravatar || rows.contains(where:{ $0.profileURL != nil }) else { return }
-        defer { save() }
+        do {try await resolveAutomaticQueue(now:now)}
+        catch {try? await saveAsync();throw error}
+        try await saveAsync()
+    }
+    private func resolveAutomaticQueue(now:Date) async throws {
         let website = useWebsite, gravatar = useGravatar, timeout = lookupTimeout
         let fallbacks=managedFallbackIDs()
         let resolver = automaticResolver ?? resolverFactory()
@@ -353,7 +357,7 @@ extension AppModel {
                     kickMailSync()
                 }
                 automaticFinished += updated
-                if updated > 0 && (automaticFinished % 10 < updated) { save() }
+                if updated > 0 && (automaticFinished % 10 < updated) {try await saveAsync()}
                 await Task.yield()
             }
         }

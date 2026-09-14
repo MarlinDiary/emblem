@@ -142,7 +142,9 @@ import PortraitCore
         model.isShuttingDown=true
         let tasks=[model.discoveryTask,model.automaticTask,model.syncTask,model.gmailSyncTask,model.gmailPushMaintenanceTask].compactMap{$0}
         for task in tasks {task.cancel()};for task in tasks {await task.value}
-        model.save();writeStatus(yielded ? "yielded":"completed",root:root,model:model)
+        do {try await model.saveAsync()}
+        catch {writeStatus("save-error",root:root,model:model,attention:error.localizedDescription);return 1}
+        writeStatus(yielded ? "yielded":"completed",root:root,model:model)
         print("BACKGROUND_AGENT=\(yielded ? "YIELDED":"COMPLETED") PID=\(getpid())")
         return 0
     }
