@@ -140,8 +140,12 @@ extension AppModel {
         automaticEnabled = false
         stopAutomaticWork()
     }
-    var automaticMayRun: Bool {
-        backgroundWorkAllowed && !isShuttingDown && !demo && automation.setupComplete && automaticEnabled && launchError == nil && !busy && !syncPassRunning &&
+    var automaticMayRun: Bool { automaticLookupMayRun && !syncPassRunning }
+    // Network lookup is an independent producer. Contacts synchronization has
+    // its own single-writer and row-revision guards; it must not lose new-mail
+    // lookup wakeups or discard a result after awaiting the network.
+    var automaticLookupMayRun: Bool {
+        backgroundWorkAllowed && !isShuttingDown && !demo && automation.setupComplete && automaticEnabled && launchError == nil && !busy &&
         !showApplyConfirmation && !showBatchConfirmation && undoBatchID == nil && !showSourceConsent && !showContactConsent && !showAutomaticSetup &&
         !showImport && !showScan && undoRecord == nil
     }
@@ -179,7 +183,7 @@ extension AppModel {
     }
     func kickAutomaticLookup(now: Date = Date()) {
         let fallbacks=managedFallbackIDs()
-        guard automaticMayRun, automaticTask == nil,
+        guard automaticLookupMayRun, automaticTask == nil,
               rows.contains(where:{ AutomaticLookupPolicy.due($0,website:useWebsite,gravatar:useGravatar,now:now,managedFallback:fallbacks.contains($0.id)) }) else { return }
         automaticTask = Task { [weak self] in
             guard let self else { return }
@@ -291,11 +295,13 @@ extension AppModel {
         try await withThrowingTaskGroup(of:LookupJobResult.self) { group in
             while true {
                 try Task.checkCancellation()
-                guard automaticMayRun, useWebsite == website, useGravatar == gravatar else { group.cancelAll(); return }
+                guard automaticLookupMayRun, useWebsite == website, useGravatar == gravatar else { group.cancelAll(); return }
                 let due = rows.filter { AutomaticLookupPolicy.due($0,website:website,gravatar:gravatar,now:now,managedFallback:fallbacks.contains($0.id)) }
                 automaticTotal = automaticFinished + due.count
                 var ordered = due.sorted {
                     if ($0.id == selectedID) != ($1.id == selectedID) { return $0.id == selectedID }
+                    if ($0.lastLookup == nil) != ($1.lastLookup == nil) {return $0.lastLookup == nil}
+                    if $0.discoveredAt != $1.discoveredAt {return ($0.discoveredAt ?? .distantPast)>($1.discoveredAt ?? .distantPast)}
                     return (Self.lookupJobKey($0,gravatar:gravatar),$0.id) < (Self.lookupJobKey($1,gravatar:gravatar),$1.id)
                 }
                 while inFlight.count < 3 && !ordered.isEmpty {
@@ -317,7 +323,7 @@ extension AppModel {
                 guard !inFlight.isEmpty, let finished = try await group.next() else { return }
                 inFlight.remove(finished.key); activeLookups.removeAll { $0.id == finished.key }
                 try Task.checkCancellation()
-                guard automaticMayRun, useWebsite == website, useGravatar == gravatar else { group.cancelAll(); return }
+                guard automaticLookupMayRun, useWebsite == website, useGravatar == gravatar else { group.cancelAll(); return }
                 if finished.timedOut { automaticTimeouts += 1 }
                 // Re-evaluate after await: deleted, ignored, completed, and manually
                 // selected rows win. New aliases from later pages receive this result.
@@ -340,7 +346,12 @@ extension AppModel {
                     changedIDs.insert(replacement[index].id)
                     updated += 1
                 }
-                if updated > 0 { replaceRowsPreservingGrouping(replacement, changedIDs: changedIDs) }
+                if updated > 0 {
+                    replaceRowsPreservingGrouping(replacement, changedIDs: changedIDs)
+                    // Apply ready photos without waiting for unrelated slow sites
+                    // or the rest of a large upgrade/archive queue to finish.
+                    kickMailSync()
+                }
                 automaticFinished += updated
                 if updated > 0 && (automaticFinished % 10 < updated) { save() }
                 await Task.yield()
