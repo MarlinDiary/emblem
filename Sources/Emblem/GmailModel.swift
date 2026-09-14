@@ -291,17 +291,23 @@ extension AppModel {
         // encode and atomically replace a large library merely to update Gmail.
         if rowsRevision != previousRowsRevision && !addedSender {
             try persistInboxReceiptOverlay(ids:receiptOnlyIDs)
-            lastSavedRowsRevision=rowsRevision
+            if lastSavedRowsRevision == previousRowsRevision {lastSavedRowsRevision=rowsRevision}
         } else if rowsRevision != previousRowsRevision {
-            while true {
-                try Task.checkCancellation()
-                let snapshot=rows,revision=rowsRevision
-                let data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value
-                guard revision==rowsRevision else{continue}
+            try Task.checkCancellation()
+            let snapshot=rows,revision=rowsRevision
+            let data:Data
+            if let encoder=gmailRowsEncoder {data=try await encoder(snapshot)}
+            else {data=try await Task.detached(priority:.utility) {try JSONEncoder().encode(snapshot)}.value}
+            try Task.checkCancellation()
+            // The batch is already in this snapshot. Later unsaved avatar edits
+            // remain dirty; they must not starve the mail cursor by restarting
+            // encoding forever. A newer durable save already includes this batch,
+            // so never overwrite it with an older in-flight snapshot.
+            if (lastSavedRowsRevision ?? 0)<revision {
                 try data.write(to:stateURL,options:.atomic)
                 try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:stateURL.path)
-                try clearInboxReceiptOverlay()
-                lastSavedRowsRevision=revision;break
+                if rowsRevision==revision {try clearInboxReceiptOverlay()}
+                lastSavedRowsRevision=revision
             }
         }
         guard let i=gmail.accounts.firstIndex(where:{$0.id==accountID}) else{return}

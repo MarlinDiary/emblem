@@ -115,6 +115,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
     lazy var gmailAuthorization = GmailAuthorization()
     var gmailAPI = GmailAPI()
     var gmailTokenProvider: ((String) async throws -> String)?
+    var gmailRowsEncoder: (([SenderRow]) async throws -> Data)?
     @Published var useGravatar = false { didSet { automaticSourcesChanged() } }
     @Published var useWebsite = false { didSet { automaticSourcesChanged() } }
     @Published var automaticEnabled = true { didSet { if !automaticEnabled { stopAutomaticWork() }; saveAutomationPreferences() } }
