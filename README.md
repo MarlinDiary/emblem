@@ -1,4 +1,10 @@
-# Emblem
+<p align="center">
+  <img src="docs/images/emblem-icon.png" alt="Emblem app icon" width="112" height="112">
+</p>
+
+<h1 align="center">Emblem</h1>
+
+<p align="center">A familiar face for your inbox.</p>
 
 Emblem is a local-first macOS companion for sender avatars in Apple Mail. It discovers people and brands from Gmail or Apple Mail, finds high-quality public artwork, and keeps the matching cards in Apple Contacts up to date.
 
@@ -10,6 +16,12 @@ Emblem is a local-first macOS companion for sender avatars in Apple Mail. It dis
 Download: [Emblem 0.19.0 for macOS](https://github.com/MarlinDiary/emblem/releases/download/v0.19.0/Emblem-0.19.0-macOS.zip) · Website: [emblem.protoyard.com](https://emblem.protoyard.com/) · Privacy: [emblem.protoyard.com/privacy](https://emblem.protoyard.com/privacy/)
 
 [0.20.0 RC5 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.5) adds a native Liquid Glass icon: a warm-gray circular lens sits over the body, with the head above it and no bright upper rim. It also includes Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates. Build52 real own INBOX+SENT participant measured Push1.81s and independently verified first Contacts photo5.37s; this is a sample, not a delivery guarantee.
+
+<p align="center">
+  <img src="docs/images/apple-mail-avatars.png" alt="Apple Mail showing sender photos and brand logos synchronized through Apple Contacts by Emblem" width="100%">
+</p>
+
+<p align="center"><sub>Sender photos and brand logos in Apple Mail, synced through Apple Contacts.</sub></p>
 
 ## What it does
 
@@ -69,7 +81,7 @@ Public Google verification and clean-Mac OAuth onboarding are separate release g
 
 - macOS 14 or later
 - Xcode 26 or later to build
-- Apple Silicon is the currently tested binary architecture
+- Apple silicon for stable 0.19.0; Apple silicon and Intel for 0.20.0 previews
 - Contacts permission for synchronization
 - Apple Events permission only when the Apple Mail provider is enabled
 
@@ -91,7 +103,7 @@ Dependencies are resolved by Swift Package Manager. AppAuth 3.0.0 is used for OA
 
 ## Gmail configuration
 
-The repository contains no OAuth client secret, refresh token, mailbox data, or maintainer credentials.
+The repository contains no OAuth client secret, refresh token, local sender library, or maintainer authentication credentials.
 
 For a source build:
 
