@@ -81,3 +81,18 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run deploy:dry
+
+  public-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Website resources and isolated withdrawal
+        run: |
+          cd Site
+          node build.mjs
+          node test.mjs
+          python3 -m unittest test_rollback.py -v

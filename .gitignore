@@ -34,3 +34,8 @@ last-scan.json
 background-status.json
 inbox-receipts.json
 Diagnostics/
+
+# Public website generated/runtime state
+Site/dist/
+Site/worker.mjs
+Site/.wrangler/

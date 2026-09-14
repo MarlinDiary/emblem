@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel><title>Emblem Updates</title><link>https://emblem.protoyard.com/</link><description>Developer ID signed and Ed25519 verified Emblem updates. Preview builds are not offered on the stable channel.</description><language>en</language></channel></rss><!-- sparkle-signatures:
+edSignature: +OyMWgRDPGhHNhwRMGvi6T2Xrm7X9BpRQI+8XPLx2x0Hq9RZsL1txr2cIXNIyGKfAejiwqWaJUxmLnbWMedmAQ==
+length: 634
+-->

@@ -61,3 +61,33 @@ The source-built ad-hoc CI matrix is distinct from the downloadable signed
 archive. The separate Signed release runtime workflow verifies the exact public
 ZIP SHA256, Developer ID, stapled ticket and isolated execution on the OS matrix.
 Neither cross-compilation nor a different SDK build substitutes for that gate.
+
+## Final build52 sample (14 September 2026)
+
+Compiled source: `ac15a3b02900b27003bafd5e980a447b9457bf9c`.
+Main merge: `2fe764e4fd725610aab79552a6c908a0035e049d`.
+[RC2](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.2)
+archive SHA256: `32b3a9c85e8a61d9c64aa010ce2db351e39f16e3356802cd9db2d5bf255b48a7`.
+
+- Source CI all green: unit/rendering, relay, source-built package14/15/15-intel/26/26-intel.
+- Local Swift428 total:416 passing,12 private opt-in skips,zero failures; Operations11;relay9.
+- Real own INBOX+SENT controlled recipient:Push1.807s,target history3.098s,
+  applied Contacts journal4.637s,independent native Contacts photo readback5.372s.
+  Foreground absent,same WebSocket,no safety poll due,no timed full-library reads.
+  This validates an outgoing participant as well as the real notification path,
+  not a universal latency guarantee or a separately controlled external sender.
+- Same85.76MB utility-QoS serialization under launchd:Background5.401s versus
+  app-style Interactive0.198s,both exit0;temporary services/copy removed.
+  Resident sockets still sleep,finite activities allow idle system sleep,and
+  image serialization stays off the UI actor. Interactive is a resource class,
+  not an instruction to show windows or enter the Dock.
+- Later Contacts history changes are conservatively kept during ignore;manual
+  deletion of this workflow's temporary own cards was independently read back.
+
+Exact public signed SDK27 ZIP runtime passed on macOS14,15,15-intel,26 and26-intel
+([run34811072985](https://github.com/MarlinDiary/emblem/actions/runs/34811072985)).
+Its exact hash, Developer ID and stapled ticket were independently verified,
+followed by isolated worker launch, accessory startup and fixture undo on each OS.
+Natural72h observations have a separate record and remain pending. Neither
+real OAuth onboarding nor older-OS full GUI behavior is inferred from fixture CI.
+The temporary Sparkle acceptance feed is removed after45→46 acceptance.

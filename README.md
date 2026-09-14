@@ -9,7 +9,7 @@ Emblem is a local-first macOS companion for sender avatars in Apple Mail. It dis
 
 Download: [Emblem 0.19.0 for macOS](https://github.com/MarlinDiary/emblem/releases/download/v0.19.0/Emblem-0.19.0-macOS.zip) · Website: [emblem.protoyard.com](https://emblem.protoyard.com/) · Privacy: [emblem.protoyard.com/privacy](https://emblem.protoyard.com/privacy/)
 
-[0.20.0 RC1 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.1) adds Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates.
+[0.20.0 RC2 preview](https://github.com/MarlinDiary/emblem/releases/tag/v0.20.0-rc.2) adds Gmail Push, progressive avatars and signed app updates. Public Google review and multi-day acceptance remain separate gates. Build52 real own INBOX+SENT participant measured Push1.81s and independently verified first Contacts photo5.37s; this is a sample, not a delivery guarantee.
 
 ## What it does
 
@@ -159,3 +159,7 @@ Issues and pull requests are welcome. Use synthetic fixtures, keep all I/O bound
 MIT. See [LICENSE](LICENSE) and [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md).
 
 The development branch also discovers the **To/Cc recipients of sent mail**, including people who have never emailed you. Gmail still uses `gmail.metadata`; it requests only From/To/Cc, IDs, labels and dates, not Bcc, bodies or subjects. Sent history and watch hints enter the same automatic avatar lookup and journaled Contacts sync as inbox senders. Legacy accounts backfill Sent separately without discarding their accepted inbox cursor. Apple Mail has an independent paged Sent import and overlapping recent delta when Gmail is unavailable. Outgoing activity does not replace inbox recency, and your own send-as addresses and ignored identities are excluded.
+
+## Public website
+
+`Site/` contains the reproducible static Cloudflare site, signed stable feed and privacy/terms. Run `cd Site && node build.mjs && node test.mjs`. Stable0.19 and Universal0.20 RC2 are labelled separately; preview acceptance is not stable promotion.
