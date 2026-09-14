@@ -53,6 +53,7 @@ if [[ -n "${EMBLEM_GOOGLE_CLIENT_ID:-}" ]]; then
 fi
 if [[ -n "${EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE:-}" ]]; then
   python3 "$ROOT/Scripts/apply-native-oauth-config.py" "$EMBLEM_GOOGLE_DESKTOP_CONFIG_FILE" "$APP/Contents/Info.plist"
+  export EMBLEM_GOOGLE_CLIENT_ID="$(/usr/libexec/PlistBuddy -c 'Print :EmblemGoogleClientID' "$APP/Contents/Info.plist")"
 fi
 # Push is an all-or-nothing build configuration; a partially configured app
 # remains an ordinary Gmail client rather than advertising instant updates.
