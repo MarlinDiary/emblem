@@ -112,6 +112,7 @@ final class SnapshotTests: XCTestCase {
     }
     /// Required offline public-artwork regression; no private state or opt-in.
     @MainActor func testPublicArtworkChoiceBorders() async throws {
+        _ = NSApplication.shared
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("public-artwork-"+UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}
         let output=ProcessInfo.processInfo.environment["EMBLEM_SNAPSHOT_DIR"].map {URL(fileURLWithPath:$0)} ?? root
