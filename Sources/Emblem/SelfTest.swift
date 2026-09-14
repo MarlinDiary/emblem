@@ -478,7 +478,7 @@ import PortraitCore
                   AutomaticLookupPolicy.due(try row("notifications@vercel.com"), website: true, gravatar: false, now: Date()) else {
                 throw PortraitError.message("changed automatic brand choices were not queued for BIMI verification")
             }
-            let mia = try row("mia.chillgood@personal.test")
+            let mia = try row("fixture-person-contacts@personal.test")
             model.section = "existing"
             guard mia.current?.image != nil, model.sectionRows.contains(where: { $0.id == mia.id }),
                   !model.rows.filter({ !$0.completed && $0.current?.image == nil }).contains(where: { $0.id == mia.id }) else {

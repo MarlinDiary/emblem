@@ -41,7 +41,7 @@ final class V094AppIdentityTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let model = AppModel(demo: true, rootOverride: root)
-        var existing = row("mia.chillgood@personal.test", "Mia Miu")
+        var existing = row("fixture-person-contacts@personal.test", "Mia Miu")
         existing.current = .init(id: "mia", name: "Mia Miu", emails: [existing.id], image: Data([1]))
         model.rows = [existing]
         XCTAssertEqual(model.existingPhotoCount, 1)
