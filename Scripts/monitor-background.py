@@ -16,7 +16,7 @@ def process_role(cmd):
     # Never match a shell command merely because its arguments mention that path.
     exe=cmd.split(None,1)[0] if cmd else ''
     if exe != 'Emblem' and not exe.endswith('/Emblem.app/Contents/MacOS/Emblem'):return None
-    return 'helper' if '--background-sync-agent' in cmd else 'worker' if '--mail-scan-worker' in cmd else 'foreground'
+    return 'helper' if '--background-sync-agent' in cmd else 'worker' if '--mail-scan-worker' in cmd or '--contact-mutation-worker' in cmd else 'foreground'
 
 def sample(root, now, online):
     accounts=read(root/'gmail.json').get('accounts',[])

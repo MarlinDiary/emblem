@@ -52,6 +52,23 @@ final class ContactMutationTests:XCTestCase {
         XCTAssertEqual(m.rows[1].chosen?.id,next.id);XCTAssertNotNil(m.rows[1].current)
         XCTAssertEqual(m.mailSync.explicitChoices[key],row.id,"The late old write must not consume the newer manual choice")
     }
+    @MainActor func testLateFailureAfterNewMailDoesNotReuseOldArrayIndices()async throws {
+        let (root,port,_,row)=try setup();defer{try? FileManager.default.removeItem(at:root)}
+        let m=AppModel(demo:true,rootOverride:root,backgroundWorkAllowed:false,contactStore:port)
+        var second=row;second=SenderRow(email:EmailAddress("second@fixture.org")!,name:"Second")
+        second.candidates=row.candidates;second.selectedCandidate=row.selectedCandidate
+        m.rows=[row,second];m.mailSync.enabled=true;m.save();var calls=0
+        m.contactMutationRunner={_ in
+            calls+=1;await Task.yield()
+            m.rows.insert(SenderRow(email:EmailAddress("new@fixture.org")!,name:"New Mail"),at:0)
+            throw PortraitError.message("Controlled backend failure")
+        }
+        try await m.performMailSync()
+        XCTAssertEqual(calls,1);XCTAssertNil(m.rows[0].applicationIssue)
+        XCTAssertNotNil(m.rows.first(where:{$0.id==row.id})?.applicationIssue)
+        XCTAssertNil(m.rows.first(where:{$0.id==second.id})?.applicationIssue)
+        XCTAssertTrue(port.contacts.isEmpty)
+    }
     @MainActor func testActualHeadlessChildDrainsAfterCallerCancellation()async throws {
         let (root,_,_,row)=try setup();defer{try? FileManager.default.removeItem(at:root)}
         let executable=Bundle(for:ContactMutationTests.self).bundleURL.deletingLastPathComponent().appendingPathComponent("Emblem")

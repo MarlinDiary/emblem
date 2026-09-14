@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import PortraitCore
 
 struct ContactMutationRequest: Codable, Sendable {
@@ -110,6 +111,14 @@ struct ContactMutationResponse: Codable, Sendable {
             let request=try JSONDecoder().decode(ContactMutationRequest.self,from:Data(contentsOf:input))
             let fixture=arguments.contains("--contact-mutation-fixture")
             guard !fixture || root.standardizedFileURL != LibraryLease.liveRoot.standardizedFileURL else{return 1}
+            if fixture {guard NSApp == nil else{return 1}}
+            else {
+                guard root.standardizedFileURL==LibraryLease.liveRoot.standardizedFileURL,
+                      try LibraryLease.writerIsBusy(root:root),
+                      input.deletingLastPathComponent()==output.deletingLastPathComponent(),
+                      input.deletingLastPathComponent().deletingLastPathComponent()==root,
+                      input.deletingLastPathComponent().lastPathComponent.hasPrefix("contact-mutation-") else{return 1}
+            }
             let store:any ContactStorePort
             if fixture {store=try FixtureContactStore(url:root.appendingPathComponent("fixture-contacts.json"))}
             else {let live=AppleContacts();try live.requireFullAccess();store=live}

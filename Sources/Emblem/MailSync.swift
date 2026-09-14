@@ -171,6 +171,7 @@ extension AppModel {
             guard let candidate=representative.chosen,candidate.source == .monogram || candidate.source == .manual || candidate.recommendedAutomatically else{continue}
             // An honest local provisional avatar may sync immediately. A later
             // web result upgrades only our unchanged automatic photo, same card.
+            let caseRevision=rowsRevision
             do {
                 let link=mailSync.links.first{$0.key==key}
                 if let link, explicit == nil,link.desiredHash==digest(candidate.png),
@@ -179,12 +180,11 @@ extension AppModel {
                     continue
                 }
                 let request=ContactMutationRequest(kind:.sync,members:members,representativeID:representative.id,key:key,explicit:explicit,link:link)
-                let startedRevision=rowsRevision
                 let response:ContactMutationResponse
                 if let runner=contactMutationRunner {response=try await runner(request)}
                 else if port is AppleContacts {response=try await ContactMutation.run(request,root:root)}
                 else {response=try ContactMutation.perform(request,port:port,engine:engine)}
-                let externallyChanged=rowsRevision != startedRevision
+                let externallyChanged=rowsRevision != caseRevision
                 if let link=response.link {
                     mailSync.links.removeAll{$0.key==key};mailSync.links.append(link)
                     mailSync.enrolled.formUnion(members.map(\.id))
@@ -198,8 +198,10 @@ extension AppModel {
                 processed+=1
                 if externallyChanged {break}
             } catch {
+                let externallyChanged=rowsRevision != caseRevision
                 let memberIDs=Set(members.map(\.id))
                 for i in rows.indices where memberIDs.contains(rows[i].id) && rows[i].applicationIssue != error.localizedDescription {rows[i].applicationIssue=error.localizedDescription}
+                if externallyChanged {break}
             }
             expectedRowsRevision=rowsRevision
             await Task.yield()

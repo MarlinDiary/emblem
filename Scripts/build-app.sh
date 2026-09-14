@@ -79,7 +79,7 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
 fi
 # Unsigned/ad-hoc source builds have no Team ID; enable Hardened Runtime only
 # for real Developer ID distributions so development can load its own framework.
-SIGN_OPTIONS=()
+SIGN_OPTIONS=(--timestamp=none)
 [[ "$SIGN_IDENTITY" == "-" ]] || SIGN_OPTIONS=(--options runtime)
 # Sign nested code inside-out. Preserve the upstream XPC entitlements rather
 # than granting Contacts/Mail privileges to the updater's downloader/installer.

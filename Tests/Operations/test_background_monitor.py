@@ -6,6 +6,7 @@ class BackgroundMonitorTests(unittest.TestCase):
  def testLaunchdRelativeNameAndNoShellFalsePositive(self):
   self.assertEqual(m.process_role('Emblem --background-sync-agent'),'helper')
   self.assertEqual(m.process_role('/Applications/Emblem.app/Contents/MacOS/Emblem --mail-scan-worker'),'worker')
+  self.assertEqual(m.process_role('/Applications/Emblem.app/Contents/MacOS/Emblem --contact-mutation-worker'),'worker')
   self.assertIsNone(m.process_role('/bin/zsh -lc echo /Applications/Emblem.app/Contents/MacOS/Emblem'))
  def testShortWindowDoesNotClaimMultiDayAcceptance(self):
   with tempfile.TemporaryDirectory() as tmp:

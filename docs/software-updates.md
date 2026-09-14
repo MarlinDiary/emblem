@@ -34,3 +34,7 @@ and verify the served feed and downloaded archive, including a tampered-input
 negative test. Keep prerelease acceptance separate from stable promotion.
 
 Source: [Sparkle documentation](https://sparkle-project.org/documentation/).
+
+The 45-to-46 transition was exercised through the full native update UI, not
+a standalone updater harness. Installed bytes, notarization and registered
+background agent 46 matched, with account and background preferences retained.
