@@ -137,3 +137,22 @@ records. Build54 observations are preserved. Build55 starts a new natural
 72-hour cohort; earlier cohorts and bounded tests are not relabelled as its
 elapsed time. Stable0.19 feed stays unchanged while long-duration acceptance,
 Google verification and clean-Mac account onboarding remain open.
+
+## Build56 non-blocking Mail scan exit
+
+The build55 cohort failed after about nine hours. The resident helper completed
+its last Gmail check at 13:47 NZST on 16 September while holding the library
+writer lease; maximum check age then grew to about 77,700s although push
+availability, idle CPU and memory checks stayed green, and the foreground stayed
+on Opening Your Library until the helper was restarted. All 14 cooperative
+threads were waiting in `Process.waitUntilExit()` after their Mail scan workers
+had exited.
+
+Foundation lists launched tasks by unretained address on the launching thread.
+A waiter on a reused Swift executor thread can match a recycled address and wait
+for an exit notification queued on another thread's run loop. Mail scan workers
+now report exit through the termination handler, with pipe I/O on GCD; timeout
+and cancellation still kill only that child. The 150-scan regression first
+failed on build55 sources at the 25-second deadline, then passed; an isolated
+6,000-call probe had no stalls. Build56 is not a published preview; signing,
+installation and any new natural cohort need their own records.

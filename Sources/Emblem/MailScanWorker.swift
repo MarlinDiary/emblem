@@ -12,31 +12,62 @@ struct MailScriptResponse:Codable,Sendable {var value:ScriptValue?;var error:Str
 /// and process lifetime also bound a non-cooperative Apple-event call.
 actor MailScanScriptRunner {
     static let shared=MailScanScriptRunner()
+    private let executable:URL?
+    private let workerArguments:[String]
+    init(executable:URL?=Bundle.main.executableURL,arguments:[String]=["--mail-scan-worker"]) {self.executable=executable;workerArguments=arguments}
     func call(_ handler:String,arguments:[ScriptValue])async throws->ScriptValue {
         try Task.checkCancellation()
-        guard let executable=Bundle.main.executableURL else{throw PortraitError.message("The Mail scan executable is missing.")}
+        guard let executable else{throw PortraitError.message("The Mail scan executable is missing.")}
         let request=try JSONEncoder().encode(MailScriptRequest(handler:handler,arguments:arguments))
-        let process=Process(),input=Pipe(),output=Pipe()
-        process.executableURL=executable;process.arguments=["--mail-scan-worker"]
-        process.standardInput=input;process.standardOutput=output;process.standardError=FileHandle.nullDevice
-        try process.run()
-        input.fileHandleForReading.closeFile();output.fileHandleForWriting.closeFile()
-        input.fileHandleForWriting.write(request);input.fileHandleForWriting.closeFile()
-        let reader=Task.detached(priority:.utility) {()->Data in
-            let data=output.fileHandleForReading.readDataToEndOfFile();process.waitUntilExit();return data
+        let workerArguments=self.workerArguments
+        let data=try await withDeadline(seconds:["scaninventory","scanroutedinventory"].contains(handler) ? 45 : 25) {
+            try await MailScanChild.output(executable:executable,arguments:workerArguments,input:request)
         }
-        do {
-            let data=try await withDeadline(seconds:["scaninventory","scanroutedinventory"].contains(handler) ? 45 : 25) {await reader.value}
-            output.fileHandleForReading.closeFile()
-            let response=try JSONDecoder().decode(MailScriptResponse.self,from:data)
-            guard response.mainThread,let value=response.value else {throw PortraitError.message(response.error ?? "Mail returned incomplete scan data.")}
-            return value
-        } catch {
+        let response=try JSONDecoder().decode(MailScriptResponse.self,from:data)
+        guard response.mainThread,let value=response.value else {throw PortraitError.message(response.error ?? "Mail returned incomplete scan data.")}
+        return value
+    }
+}
+
+/// Never use Process.waitUntilExit() here. Foundation lists launched tasks by
+/// unretained address per thread; on a reused Swift executor thread a recycled
+/// address makes it wait for an exit notification queued on another thread's run
+/// loop, so it never returns and permanently occupies a cooperative thread.
+/// Exit arrives through the termination handler, and pipe I/O stays on GCD.
+private enum MailScanChild {
+    private final class Completion:@unchecked Sendable {
+        private let lock=NSLock()
+        private var exited=false,output:Result<Data,Error>?,continuation:CheckedContinuation<Data,Error>?
+        func processExited() {lock.lock();exited=true;resumeIfReady()}
+        func outputFinished(_ value:Result<Data,Error>) {lock.lock();output=value;resumeIfReady()}
+        func wait(_ continuation:CheckedContinuation<Data,Error>) {lock.lock();self.continuation=continuation;resumeIfReady()}
+        /// Requires the lock; releases it.
+        private func resumeIfReady() {
+            guard exited,let output,let continuation else {lock.unlock();return}
+            self.continuation=nil;lock.unlock()
+            continuation.resume(with:output)
+        }
+    }
+    static func output(executable:URL,arguments:[String],input:Data)async throws->Data {
+        let process=Process(),stdin=Pipe(),stdout=Pipe(),completion=Completion()
+        process.executableURL=executable;process.arguments=arguments
+        process.standardInput=stdin;process.standardOutput=stdout;process.standardError=FileHandle.nullDevice
+        // Installed before launch so Foundation reports exit on GCD, never through a run loop.
+        process.terminationHandler={_ in completion.processExited()}
+        try process.run()
+        stdin.fileHandleForReading.closeFile();stdout.fileHandleForWriting.closeFile()
+        DispatchQueue.global(qos:.utility).async {
+            try? stdin.fileHandleForWriting.write(contentsOf:input);try? stdin.fileHandleForWriting.close()
+            completion.outputFinished(Result {try stdout.fileHandleForReading.readToEnd() ?? Data()})
+        }
+        let data=try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {completion.wait($0)}
+        } onCancel: {
             // This is only the child created above, never the user's Mail process.
             if process.isRunning {kill(process.processIdentifier,SIGKILL)}
-            reader.cancel()
-            throw error
         }
+        try Task.checkCancellation()
+        return data
     }
 }
 
