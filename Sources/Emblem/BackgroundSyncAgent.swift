@@ -17,6 +17,7 @@ import PortraitCore
     private static var processingWake=false
     private static var queuedWake=false
     private static let modelCache=BackgroundModelCache()
+    private static let watchdog=HelperWatchdog()
 
     nonisolated static func fallbackInterval(mailEnabled:Bool,accounts:[GmailAccount],now:Date)->TimeInterval {
         // Push must not slow down another mailbox that still uses regular sync.
@@ -41,6 +42,10 @@ import PortraitCore
         do {
             let root=try EmblemMigration.migrateLibraryIfNeeded()
             guard backgroundEnabled(root:root) else {writeStatus("disabled",root:root);return 0}
+            watchdog.start(timing:.live) {stalled in
+                HelperWatchdog.recordRestart(root:root,stalledSeconds:stalled)
+                _exit(HelperWatchdog.exitCode)
+            }
             // Start registered sockets before any potentially long archive/avatar pass.
             if GmailPushConfiguration.current() != nil,!listenerDescriptors(root:root).isEmpty {return await listen(root:root)}
             if !LibraryLease.foregroundRequested(root:root) {_=await processOnce(root:root)}
@@ -120,7 +125,8 @@ import PortraitCore
     private static func processOnce(root:URL)async->Int32 {
         if LibraryLease.foregroundRequested(root:root) {modelCache.discard();return 0}
         guard let lease=try? LibraryLease.acquire(root:root) else{return 0}
-        defer {withExtendedLifetime(lease){}}
+        watchdog.leaseHeld=true
+        defer {watchdog.leaseHeld=false;withExtendedLifetime(lease){}}
         return await perform(root:root)
     }
 
