@@ -156,3 +156,31 @@ and cancellation still kill only that child. The 150-scan regression first
 failed on build55 sources at the 25-second deadline, then passed; an isolated
 6,000-call probe had no stalls. Build56 is not a published preview; signing,
 installation and any new natural cohort need their own records.
+
+## Build57 Push ping, helper watchdog and acceptance checks
+
+Build56's helper crashed at 12:45 NZST on 17 September, about 40 minutes into its
+cohort. Build55 crashed the same way at 17:41 and 21:11 on 15 September and 04:30
+on 16 September; launchd restarted each one and the build55 summary did not say
+so. Three of the four reports were written within 17 seconds of wake. URLSession
+delivered one ping's result twice as its connection failed, and resuming the
+same continuation again trapped. The ping regression reproduced that trap before
+the fix; the first report is now the only one used.
+
+The helper now runs a GCD watchdog. Its heartbeat must pass through the utility
+cooperative pool and the main actor; after 120 seconds without one while holding
+the writer lease, or 600 seconds idle, the helper records `watchdog-restart` and
+exits so flock releases the lease and launchd restarts it. Uptime excludes sleep.
+Isolated fixtures stall the pool and the main thread, give an idle stall its
+longer grace and keep a healthy helper running. Decoding an unchanged library
+copy took about 0.1 seconds, far below the lease threshold.
+
+Closed Apple Mail is no longer reported as missing automation permission. The
+fixture Contacts worker no longer uses `waitUntilExit()`, and a source check
+keeps that call out of app sources.
+
+The monitor now fails on stale Gmail checks (45 minutes while online and expected,
+after a 20-minute grace following sleep, reboot or reconnect), helper restarts
+within one boot and Emblem crash reports in the window, recording report names
+only. Replaying the build55 samples fails all three. Build57 is not a published
+preview; its signing, installation and cohort need their own records.
