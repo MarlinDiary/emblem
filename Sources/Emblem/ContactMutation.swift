@@ -108,7 +108,11 @@ struct ContactMutationResponse: Codable, Sendable {
             } else {
                 let process=Process();process.executableURL=executable;process.arguments=arguments
                 process.standardOutput=FileHandle.nullDevice;process.standardError=FileHandle.nullDevice
-                try process.run();process.waitUntilExit()
+                // Like MailScanChild: exit arrives through GCD, never a thread-local wait.
+                try await withCheckedThrowingContinuation {(exited:CheckedContinuation<Void,Error>) in
+                    process.terminationHandler={_ in exited.resume()}
+                    do {try process.run()} catch {process.terminationHandler=nil;exited.resume(throwing:error)}
+                }
             }
             guard FileManager.default.fileExists(atPath:output.path) else {throw PortraitError.message("The Contacts worker stopped. Its write-ahead record is retained; review Contacts before retrying.")}
             return try JSONDecoder().decode(ContactMutationResponse.self,from:Data(contentsOf:output))

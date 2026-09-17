@@ -21,6 +21,16 @@ final class MailScanRunnerTests:XCTestCase {
         }
     }
 
+    func testSourcesNeverWaitForChildExitWithWaitUntilExit()throws {
+        let sources=URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources/Emblem")
+        for file in try FileManager.default.contentsOfDirectory(at:sources,includingPropertiesForKeys:nil) where file.pathExtension=="swift" {
+            let calls=try String(contentsOf:file,encoding:.utf8).split(separator:"\n").filter {
+                !$0.trimmingCharacters(in:.whitespaces).hasPrefix("//") && $0.contains(".waitUntilExit()")
+            }
+            XCTAssertTrue(calls.isEmpty,"\(file.lastPathComponent) waits through Process.waitUntilExit()")
+        }
+    }
+
     func testCancellationKillsTheWorkerChild()async throws {
         let marker=FileManager.default.temporaryDirectory.appendingPathComponent("mail-scan-worker-"+UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:marker)}
