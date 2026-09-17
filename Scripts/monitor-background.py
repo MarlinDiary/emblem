@@ -51,9 +51,48 @@ def sample(root, now, online):
     except (OSError,ValueError):build='unknown'
     return dict(installedBuild=build,epoch=now,at=datetime.datetime.fromtimestamp(now,datetime.timezone.utc).isoformat(),
                 boot=boot,online=online,syncExpected=enabled,accountCount=len(accounts),validWatches=valid,healthyPushAccounts=healthy,
-                watchRenewalEpochs=sorted(renewals),maxCheckAgeSeconds=round(max(check_ages,default=0),1),processes=processes)
+                watchRenewalEpochs=sorted(renewals),maxCheckAgeSeconds=round(max(check_ages,default=0),1),processes=processes,
+                helperState=read(root/'background-status.json').get('state'))
 
-def summary(points, duration, complete):
+STALE_CHECK_SECONDS=2700  # three 15-minute safety intervals
+CHECK_GRACE_SECONDS=1200  # after sleep, reboot or returning online, before the next check
+
+def freshness(points):
+    """Longest Gmail check age while a check was expected. Healthy Push stayed green
+    through a 21-hour stall, so check age is judged on its own."""
+    longest=0.0;stale=0;grace_until=0;previous=None
+    for p in points:
+        eligible=p.get('online') is True and bool(p.get('syncExpected')) and p.get('accountCount',0)>0
+        if eligible and (previous is None or not previous[1] or p['epoch']-previous[0]['epoch']>180 or p.get('boot')!=previous[0].get('boot')):
+            grace_until=p['epoch']+CHECK_GRACE_SECONDS
+        previous=(p,eligible)
+        if not eligible or p['epoch']<grace_until:continue
+        age=float(p.get('maxCheckAgeSeconds') or 0)
+        longest=max(longest,age);stale+=int(age>STALE_CHECK_SECONDS)
+    return round(longest,1),stale
+
+def helper_restarts(points):
+    """Helper PID changes within one boot: launchd restarted a crashed or stalled helper."""
+    restarts=0;last=None
+    for p in points:
+        pids=[x['pid'] for x in p.get('processes',[]) if x.get('role')=='helper' and 'pid' in x]
+        if len(pids)!=1:continue
+        if last is not None and last[0]==p.get('boot') and last[1]!=pids[0]:restarts+=1
+        last=(p.get('boot'),pids[0])
+    return restarts
+
+def crash_reports(directory,start,end):
+    """Names of Emblem crash reports written during the window; contents are never read."""
+    names=[]
+    try:entries=list(Path(directory).iterdir())
+    except OSError:return names
+    for entry in entries:
+        try:
+            if entry.name.startswith('Emblem') and entry.suffix in ('.ips','.crash') and start<=entry.stat().st_mtime<=end+60:names.append(entry.name)
+        except OSError:pass
+    return sorted(names)
+
+def summary(points, duration, complete, crashes=()):
     eligible=[p for p in points if p['online'] is True and p['syncExpected'] and p['accountCount']>0]
     healthy=[p for p in eligible if p['healthyPushAccounts']==p['accountCount'] and any(x['role']=='helper' for x in p['processes'])]
     # Measure the resident helper, not CPU/RSS from someone actively using the
@@ -67,14 +106,17 @@ def summary(points, duration, complete):
     elapsed=last.get('epoch',0)-first.get('epoch',0)
     fraction=len(healthy)/len(eligible) if eligible else None
     renewed=any(p.get('watchRenewalEpochs')!=first.get('watchRenewalEpochs') for p in points)
+    longest,stale=freshness(points);restarts=helper_restarts(points)
     checks=dict(singleInstalledBuild=len(set(p.get('installedBuild','fixture') for p in points))==1,elapsedWindow=complete and elapsed>=duration-1,pushAvailability=fraction is not None and fraction>=0.99,
                 idleCPU=bool(cpu) and statistics.median(cpu)<2 and percentile(cpu,.95)<8,
-                memory=bool(memory) and percentile(memory,.95)<500,automaticWatchRenewal=renewed)
+                memory=bool(memory) and percentile(memory,.95)<500,automaticWatchRenewal=renewed,
+                syncFreshness=stale==0,helperContinuity=restarts==0,noCrashReports=not crashes)
     return dict(status='completed' if complete else 'running',requestedSeconds=duration,elapsedSeconds=round(elapsed,1),samples=len(points),
                 installedBuilds=sorted(set(p.get('installedBuild','fixture') for p in points)),eligibleOnlineSamples=len(eligible),pushHealthyFraction=fraction,idleCPUMedian=statistics.median(cpu) if cpu else None,
                 idleCPUP95=percentile(cpu,.95),rssMBP95=percentile(memory,.95),idleSamples=len(idle),
                 idleScope='Resident helper only; foreground/worker samples retained but excluded from idle metrics.',distinctBoots=len(set(p['boot'] for p in points)),
                 longGaps=sum(b['epoch']-a['epoch']>180 for a,b in zip(points,points[1:])),watchRenewalObserved=renewed,
+                longestCheckAgeSeconds=longest,staleCheckSamples=stale,helperRestarts=restarts,crashReports=sorted(crashes),
                 checks=checks,accepted=complete and all(checks.values()),
                 boundary='Natural awake/online observation; gaps do not prove sleep or forced reboot. Short runs are not multi-day acceptance.',
                 contactsReads=0,contactsWrites=0,keychainReads=0,mailRequests=0)
@@ -83,6 +125,7 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,default=Path.home()/'Library/Application Support/Emblem')
     parser.add_argument('--output',type=Path,required=True);parser.add_argument('--duration',type=float,default=259200)
     parser.add_argument('--interval',type=float,default=60);parser.add_argument('--offline-fixture',action='store_true')
+    parser.add_argument('--diagnostic-reports',type=Path,default=Path.home()/'Library/Logs/DiagnosticReports')
     args=parser.parse_args()
     if not 1<=args.duration<=604800 or not 0.1<=args.interval<=3600:parser.error('Use bounded duration/interval')
     args.output.mkdir(parents=True,exist_ok=True);os.chmod(args.output,0o700)
@@ -108,7 +151,7 @@ def main():
         with log.open('a') as f:f.write(json.dumps(points[-1],sort_keys=True)+'\n')
         os.chmod(log,0o600)
         complete=now-started>=args.duration
-        result=summary(points,args.duration,complete)
+        result=summary(points,args.duration,complete,crash_reports(args.diagnostic_reports,started,now))
         temp=args.output/'summary.tmp';temp.write_text(json.dumps(result,indent=2)+'\n');os.chmod(temp,0o600);temp.replace(args.output/'summary.json')
         if complete or (args.output/'STOP').exists():break
         time.sleep(min(args.interval,max(.1,args.duration-(now-started))))
