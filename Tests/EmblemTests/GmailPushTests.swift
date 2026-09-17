@@ -173,6 +173,13 @@ final class GmailPushTests: XCTestCase {
         }
     }
 
+    func testClosedMailIsNotReportedAsMissingAutomationPermission() {
+        XCTAssertNil(BackgroundSyncAgent.mailFallbackAttention(permission: noErr))
+        XCTAssertNil(BackgroundSyncAgent.mailFallbackAttention(permission: OSStatus(procNotFound)), "Mail is only closed")
+        XCTAssertNotNil(BackgroundSyncAgent.mailFallbackAttention(permission: OSStatus(errAEEventNotPermitted)))
+        XCTAssertNotNil(BackgroundSyncAgent.mailFallbackAttention(permission: OSStatus(errAEEventWouldRequireUserConsent)))
+    }
+
     func testWriterProbeDetectsForegroundExitWithoutKeepingTheLease() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

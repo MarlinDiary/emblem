@@ -22,6 +22,10 @@ import PortraitCore
         // Push must not slow down another mailbox that still uses regular sync.
         mailEnabled || accounts.contains(where:{!$0.pushIsHealthy(at:now)}) ? 60:900
     }
+    nonisolated static func mailFallbackAttention(permission:OSStatus)->String? {
+        // procNotFound only means Mail is closed; its fallback resumes when Mail runs.
+        permission == noErr || permission == OSStatus(procNotFound) ? nil : "Apple Mail fallback needs permission. Gmail continues checking connected accounts."
+    }
     private static func fallbackInterval(root:URL)->TimeInterval {
         let automation=(try? Data(contentsOf:root.appendingPathComponent("automation.json"))).flatMap{try? JSONDecoder().decode(AutomationPreferences.self,from:$0)}
         var accounts=(try? Data(contentsOf:root.appendingPathComponent("gmail.json"))).flatMap{try? JSONDecoder().decode(GmailConnections.self,from:$0)}?.accounts ?? []
@@ -128,13 +132,14 @@ import PortraitCore
         guard CNContactStore.authorizationStatus(for:.contacts) == .authorized else {writeStatus("contacts-permission-required",root:root);return 0}
         let automation=try? JSONDecoder().decode(AutomationPreferences.self,from:Data(contentsOf:root.appendingPathComponent("automation.json")))
         let target=NSAppleEventDescriptor(descriptorType:typeApplicationBundleID,data:Data("com.apple.mail".utf8))
-        let mailAllowed=target.map {AEDeterminePermissionToAutomateTarget($0.aeDesc,typeWildCard,typeWildCard,false)==noErr} ?? false
+        let permission=target.map {AEDeterminePermissionToAutomateTarget($0.aeDesc,typeWildCard,typeWildCard,false)} ?? OSStatus(errAEEventNotPermitted)
+        let mailAllowed=permission==noErr
         let model:AppModel
         do {model=try modelCache.model(root:root) {AppModel(demo:false,rootOverride:root)}}
         catch {writeStatus("library-read-error",root:root,attention:error.localizedDescription);return 1}
         guard model.launchError == nil,model.automation.setupComplete else {writeStatus("setup-required",root:root,model:model);return 0}
         model.mailAutomationAvailable=mailAllowed
-        if automation?.mail != false && !mailAllowed {model.automaticAttention="Apple Mail fallback needs permission. Gmail continues checking connected accounts."}
+        if automation?.mail != false,let attention=mailFallbackAttention(permission:permission) {model.automaticAttention=attention}
         model.allowsHistoryScan=false;model.allowsPermissionPrompts=false;model.automation.contactsPrompted=true
         guard !LibraryLease.foregroundRequested(root:root) else {writeStatus("yielded",root:root,model:model);return 0}
         writeStatus("running",root:root,model:model)
