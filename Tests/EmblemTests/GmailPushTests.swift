@@ -158,6 +158,21 @@ final class GmailPushTests: XCTestCase {
         XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, accounts: [GmailAccount(id: "regular", email: "fixture@gmail.com")], now: now), 60)
     }
 
+    /// URLSession reported one ping twice when its connection failed seconds after wake;
+    /// resuming the same continuation again crashed the helper.
+    func testRepeatedPingReportAfterConnectionFailureKeepsFirstResult() async throws {
+        try await GmailPushSessionSocket.pong { report in report(nil); report(URLError(.networkConnectionLost)) }
+        do {
+            try await GmailPushSessionSocket.pong { report in report(URLError(.networkConnectionLost)); report(URLError(.cancelled)) }
+            XCTFail("Expected the first failure")
+        } catch { XCTAssertEqual((error as? URLError)?.code, .networkConnectionLost) }
+        for _ in 0..<200 {
+            try? await GmailPushSessionSocket.pong { report in
+                DispatchQueue.concurrentPerform(iterations: 2) { index in report(index == 0 ? nil : URLError(.cancelled)) }
+            }
+        }
+    }
+
     func testWriterProbeDetectsForegroundExitWithoutKeepingTheLease() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

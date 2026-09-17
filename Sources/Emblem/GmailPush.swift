@@ -175,15 +175,26 @@ struct GmailPushSessionSocket: GmailPushSocket {
     var task: URLSessionWebSocketTask
     func resume() { task.resume() }
     func receive() async throws -> URLSessionWebSocketTask.Message { try await task.receive() }
-    func ping() async throws {
+    func ping() async throws { try await Self.pong { task.sendPing(pongReceiveHandler: $0) } }
+    /// URLSession can report one ping twice when its connection fails, e.g. seconds
+    /// after wake. A second resume of the continuation traps, so the first report wins.
+    static func pong(_ send: (@escaping @Sendable (Error?) -> Void) -> Void) async throws {
+        let report = PongReport()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            task.sendPing { error in
+            send { error in
+                guard report.claim() else { return }
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume() }
             }
         }
     }
     func cancel() { task.cancel(with: .goingAway, reason: nil) }
+}
+
+private final class PongReport: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reported = false
+    func claim() -> Bool { lock.withLock { defer { reported = true }; return !reported } }
 }
 
 /// Reject redirects rather than forwarding a registration identity/channel token.
