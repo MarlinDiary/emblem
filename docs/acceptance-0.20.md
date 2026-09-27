@@ -211,5 +211,34 @@ reports nothing new. Reading that cursor moved off the main actor after it block
 discovery pass for about 40 seconds without Contacts access. The change journal is
 written without pretty printing.
 
+Build58 was signed with the Developer ID identity, not notarized, and installed over
+build57 at 17:54 NZST on 27 September; the previous library was archived and the replaced
+bundle kept. The live migration turned a 91.26 MB `senders.json`, left intact, into a
+3.64 MB `senders-v2.json` beside 998 photo files of 30.9 MB: 1,062 rows, 998 references
+with no missing or orphaned file, and 2,339 photo comparisons byte-identical.
+
+Four windows were then measured on that installed build. Twelve minutes while the
+foreground app finished its first pass: 35 library writes of 3.64 MB, 127.3 MB, no photo
+file rewritten. Six minutes with the foreground app open and idle: no write at all.
+Twelve minutes with the app closed, the condition of the 407 GB/day measurement: no pass
+and no write, because the Apple Mail fallback had already backed off to 900 seconds.
+Thirty minutes with the app closed, spanning four passes: 53 library writes, 196.6 MB,
+about 9.4 GB a day, while the change journal recorded one Contacts write. No window
+rewrote a photo file.
+
 Build58 is not a published preview; its signing, installation and cohort need their own
 records, and the write-volume claims above are single-machine measurements.
+
+## Build59 deferred sync bookkeeping
+
+Those 53 rewrites had one cause. Every finished lookup and every provisional monogram
+kicks a sync pass, and the pass flushed the whole library whether or not it had written
+anything to Contacts; with the app closed, rewrites landed two to four seconds apart for
+a minute at a time. A pass now reports whether it completed a Contacts write. Only then
+is the library flushed immediately; otherwise its bookkeeping joins the next deferred
+save, which the end of a background pass, a sync error and quit still force. The
+regression reproduces the measured shape — six bookkeeping-only passes after one applied
+photo — and rewrote the library seven times before the change.
+
+Build59 needs its own signing, installation, natural cohort and write measurement.
+Build58's observations are retained and not relabelled as build59's.
