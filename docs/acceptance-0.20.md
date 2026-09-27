@@ -291,3 +291,12 @@ centre, so the lens spans 70%. Colours, layer order, refraction and the disabled
 specular are unchanged, and the shoulders still end exactly on the lens circle. The
 website's flat and 3D icons follow the same geometry. Application sources are unchanged
 from build60.
+
+Build61 was signed with the same identity, again not notarized, and installed over
+build60 on 28 September after the same library archive; its bundle differs from
+build60's only in bundle version and source revision, with an identical designated
+requirement and entitlements, and the installed icon rendered by the system's own icon
+service is byte-identical to the committed source. Build60's cohort ended after 63
+minutes and 64 samples: Push healthy throughout, idle CPU median 0.0% and 95th
+percentile 2.1%, RSS 95th percentile 167 MB, no helper restart, crash report or stale
+Gmail check, longest check age 1,033 s. Build61 starts its own 72-hour cohort.
