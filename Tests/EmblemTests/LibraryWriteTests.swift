@@ -77,3 +77,43 @@ private actor EncodeCounter {
     private(set) var count=0
     func record() {count += 1}
 }
+
+extension LibraryWriteTests {
+    /// Measured on the installed build58 with the app closed: 30 minutes of helper
+    /// passes rewrote the 3.64 MB library 53 times while the change journal recorded
+    /// one Contacts write. Every lookup result and every provisional monogram kicks a
+    /// sync pass, and each pass flushed the whole library whether or not it had
+    /// written anything to Contacts.
+    @MainActor func testASyncPassThatAppliesNothingLeavesTheRewriteDeferred()async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("sync-write-"+UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:root)}
+        let m=AppModel(demo:true,rootOverride:root,backgroundWorkAllowed:false)
+        let photo=try NameAvatar.candidate(name:"SevenRooms")
+        m.rows=[SenderRow(email:EmailAddress("hello@sevenrooms.com")!,name:"SevenRooms",candidates:[photo],selectedCandidate:photo.id,discoveredAt:Date())]
+        m.mailSync.enabled=true
+        let counter=EncodeCounter()
+        m.rowsSnapshotEncoder={rows in await counter.record();return try RowsPersistence.encode(rows)}
+
+        try await m.performMailSync()
+        XCTAssertEqual(try m.engine.records().count,1,"The first pass writes one contact")
+        var encodes=await counter.count
+        XCTAssertEqual(encodes,1,"A completed Contacts write is a durable boundary")
+
+        // Each pass is preceded by the bookkeeping that kicked it: a finished lookup
+        // stores its result, status and retry stamp on rows it cannot apply anywhere.
+        for attempt in 0..<6 {
+            m.rows[0].status="No photo yet; lookup will retry (\(attempt))."
+            m.rows[0].lastLookup=Date()
+            try await m.performMailSync()
+        }
+        encodes=await counter.count
+        XCTAssertEqual(encodes,1,"Passes that apply nothing must not rewrite the library")
+        XCTAssertEqual(try m.engine.records().count,1,"No extra Contacts writes were made")
+        XCTAssertNotEqual(m.lastSavedRowsRevision,m.rowsRevision,"Their bookkeeping is still pending, not lost")
+
+        try await m.saveAsync()
+        encodes=await counter.count
+        XCTAssertEqual(encodes,2,"One flush covers every deferred pass")
+        XCTAssertEqual(m.lastSavedRowsRevision,m.rowsRevision)
+    }
+}

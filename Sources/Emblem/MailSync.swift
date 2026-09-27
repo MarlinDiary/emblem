@@ -119,12 +119,18 @@ extension AppModel {
     }
     func performMailSync(limit:Int=20) async throws {
         guard mailSync.enabled,launchError == nil,!busy,!isScanning,!syncPassRunning else{return}
-        do {try await performMailSyncPass(limit:limit)}
+        let applied:Bool
+        do {applied=try await performMailSyncPass(limit:limit)}
         catch {try? await saveAsync();throw error}
-        try await saveAsync()
+        // A completed Contacts write is the durable boundary; a pass that wrote
+        // nothing there has only bookkeeping to store, and every finished lookup
+        // and provisional monogram kicks a pass. A measured 30 minutes of helper
+        // passes rewrote the library 53 times for one Contacts write.
+        if applied {try await saveAsync()} else {saveSoon()}
     }
-    private func performMailSyncPass(limit:Int) async throws {
-        guard mailSync.enabled,launchError == nil,!busy,!isScanning,!syncPassRunning else{return}
+    /// Whether this pass completed a Contacts write that the library must record.
+    @discardableResult private func performMailSyncPass(limit:Int) async throws -> Bool {
+        guard mailSync.enabled,launchError == nil,!busy,!isScanning,!syncPassRunning else{return false}
         syncPassRunning=true;defer{syncPassRunning=false}
         if let live=port as? AppleContacts {try live.requireFullAccess()}
         try await prepareSyncPhotoEvidence()
@@ -141,7 +147,7 @@ extension AppModel {
             native=try await CancellableContactRead.snapshots(ids:ids)
         } else {native=nil}
         try Task.checkCancellation()
-        guard mailSync.enabled,!busy,!isScanning else{return}
+        guard mailSync.enabled,!busy,!isScanning else{return false}
         let rowIndex=Dictionary(grouping:rows.indices,by:{MailSyncIdentity.key(rows[$0])})
         if !contactsUnchanged {try reconcileMailSync(rowIndex:rowIndex,nativeSnapshots:native)}
         defer {
@@ -206,6 +212,7 @@ extension AppModel {
             expectedRowsRevision=rowsRevision
             await Task.yield()
         }
+        return processed>0
     }
     func reconcileMailSync(rowIndex suppliedIndex:[String:[Int]]?=nil,nativeSnapshots suppliedSnapshots:[String:ContactSnapshot]?=nil) throws {
         guard mailSync.enabled else{return}
