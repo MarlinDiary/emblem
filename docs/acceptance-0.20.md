@@ -268,5 +268,16 @@ regression locks the new values as it locked the previous ones, and each candida
 compared against the system's own composite, in light and dark appearance, at 512, 128,
 64, 32 and 16 px.
 
-Build60 is not built, installed or measured. Application sources are unchanged from
-build59, whose cohort and write measurements stay build59's.
+Build60 was signed with the same identity, again not notarized, and installed over
+build59 at 22:45 NZST on 27 September after the same library archive; its bundle differs
+from build59's only in bundle version and source revision, with an identical designated
+requirement and entitlements. The installed bundle's icon, rendered by the system's own
+icon service, is byte-identical to the approved candidate. Application sources are
+unchanged from build59, so build59's write measurements are not repeated here and are
+not relabelled as build60's.
+
+Build59's cohort was ended after 3 hours 11 minutes and 148 samples when build60 replaced
+it: Push healthy in 0.993 of eligible samples, one sample stale by heartbeat while a
+worker ran, idle CPU median 0.0% and 95th percentile 7.2%, RSS 95th percentile 215 MB,
+no helper restart, no crash report, no stale Gmail check, longest check age 1,150 s.
+Build60 starts its own 72-hour cohort.
