@@ -24,6 +24,7 @@ for(const path of ['/','/privacy/','/terms/','/style.css','/icon.svg','/license.
     for(const [,link] of body.matchAll(/href="(\/[^"#]*)"/g)) assert.equal((await worker.fetch(new Request(origin+link))).status,200,link);
   }
   if(path.startsWith('/assets/')) assert.equal(response.headers.get('cache-control'),'public, max-age=31536000, immutable');
+  else if(response.headers.get('content-type').startsWith('text/html')) assert.equal(response.headers.get('cache-control'),'public, max-age=300, no-transform');
   else assert.equal(response.headers.get('cache-control'),'public, max-age=300');
   const head=await worker.fetch(new Request(origin+path,{method:'HEAD'}));assert.equal(head.status,200);assert.equal(await head.text(),'');
   console.log(`PASS GET/HEAD ${path}`);

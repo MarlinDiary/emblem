@@ -6,7 +6,8 @@ resources. It has no storage bindings, credentials, forms, mailbox backend, anal
 or external subresource requests. The homepage runs one self-hosted module that
 paints a three.js WebGL scene behind ordinary HTML; the Content Security Policy
 allows only same-origin scripts and no network connections, and the privacy and
-terms pages carry no script at all. Worker request logging is deliberately
+terms pages carry no script at all. HTML responses carry `Cache-Control: no-transform`
+so Cloudflare does not rewrite them or inject its Web Analytics beacon. Worker request logging is deliberately
 disabled for this informational site; Cloudflare platform security processing is
 disclosed in the privacy policy. The former MailPortrait hostname redirects each
 path and query to the matching Emblem URL.

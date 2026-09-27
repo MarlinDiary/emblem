@@ -20,8 +20,10 @@ export default {
     }
     const asset = Object.hasOwn(files,url.pathname) ? files[url.pathname] : undefined;
     if (!asset) return new Response(request.method==='HEAD'?null:'Page not found',{status:404,headers:{...headers,'Content-Type':'text/plain; charset=utf-8'}});
-    // Hashed build assets never change under the same name.
-    const cache = url.pathname.startsWith('/assets/') ? {'Cache-Control':'public, max-age=31536000, immutable'} : {};
+    // Hashed build assets never change under the same name. Documents opt out of
+    // edge HTML rewriting, which would otherwise inject Cloudflare's analytics beacon.
+    const cache = url.pathname.startsWith('/assets/') ? {'Cache-Control':'public, max-age=31536000, immutable'}
+      : asset[0].startsWith('text/html') ? {'Cache-Control':'public, max-age=300, no-transform'} : {};
     return new Response(request.method==='HEAD'?null:asset[1],{headers:{...headers,...cache,'Content-Type':asset[0]}});
   },
 };
