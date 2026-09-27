@@ -643,7 +643,7 @@ function buildSwarm(renderer, count) {
       scale = 0.08;
     } else if (act === 5) {
       const u = seed[i] * 2 - 1, a = seed2[i] * TAU, rr = 7 + seed3[i] * 10, sq = Math.sqrt(1 - u * u);
-      x = Math.cos(a) * sq * rr; y = u * rr * 0.7; z = Math.sin(a) * sq * rr - 6;
+      x = Math.cos(a) * sq * rr; y = u * rr * 0.7; z = Math.min(-2.5, Math.sin(a) * sq * rr - 6);
       scale = 0.03 + seed[i] * 0.035;
     } else {
       const a = phase[i] * TAU + t * (0.22 + seed2[i] * 0.05), radius = (narrow ? 1.35 : 1.75) + (seed[i] - 0.5) * 0.8;
