@@ -184,3 +184,32 @@ after a 20-minute grace following sleep, reboot or reconnect), helper restarts
 within one boot and Emblem crash reports in the window, recording report names
 only. Replaying the build55 samples fails all three. Build57 is not a published
 preview; its signing, installation and cohort need their own records.
+
+## Build58 library writes, photo storage and idle work
+
+Measured on the installed build57 with a 1,061-sender library: every pass rewrote the
+91.7 MB `senders.json`, 37 times in 12 minutes, about 407 GB a day, while only two
+rows had changed between consecutive rewrites; one pass rewrote it nine times in 32
+seconds, once per three provisional monograms. Encoding was not the cost: 0.28 s at a
+203 MB peak, against 0.31 s and 518 MB for the pre-build53 codec.
+
+Photos are now stored once by content hash beside the library. That copy migrates to a
+3 MB library plus 30 MB in 996 photo files: 65.7 MB of stored bytes deduplicate to
+30.8 MB because senders of one organisation share artwork, and base64 is gone from
+disk. It loads in 0.10 s and a bookkeeping save writes 3 MB in 0.070 s instead of
+91.7 MB in 0.28 s, with every photo byte-identical after the round trip. The
+pre-migration file is left untouched for rollback and removed seven days later; a photo
+file that goes missing costs one candidate, not the library.
+
+Bookkeeping saves are deferred 30 seconds and batched, while sync, quit and the end of
+a background pass still flush immediately. Apple Mail fallback scans step from 60 s to
+5 and 15 minutes while they keep examining nothing — the measured helper examined zero
+messages every 60–75 s for days because its only account was already covered by the
+Gmail API — and reset on real mail or a routing change; the helper's own wake interval
+follows the same backoff. The Contacts enumeration is skipped while change history
+reports nothing new. Reading that cursor moved off the main actor after it blocked a
+discovery pass for about 40 seconds without Contacts access. The change journal is
+written without pretty printing.
+
+Build58 is not a published preview; its signing, installation and cohort need their own
+records, and the write-volume claims above are single-machine measurements.
