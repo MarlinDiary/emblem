@@ -29,10 +29,16 @@ the same static files. It copies the application's existing MIT license and serv
 three.js's license at `/licenses.txt`. esbuild and three are locked build-time
 dependencies; the Worker itself needs none at runtime.
 
-On localhost only, `?act=3&t=7` shows one act with the scene fast-forwarded seven
-seconds, which makes headless captures of every act reproducible. The scene fails
-closed: without WebGL the page shows the static icon, and reduced motion replaces
-the flights with cross-fades.
+The homepage is a scroll-directed film: one camera spline through all seven acts
+(`SHOTS` in `src/home.js`), headlines as letters placed in the scene where each shot
+reads them (`TYPE`), and a grade of bloom, bokeh, grain, vignette, speed-scaled
+chromatic aberration and a letterbox. "Play the film" scrolls the page itself.
+
+On localhost only, `?act=3&u=0.6` pins the film at act 3, 60% through, and
+`?capture=1` stops the page's own clock so a script can scroll and call
+`__emblem.step(1/30)` to render exact frames for a recording. The scene fails
+closed: without WebGL the page shows the static icon, and reduced motion holds one
+still, readable shot per act with no flights, letterbox or grain animation.
 
 ## Deployment
 
