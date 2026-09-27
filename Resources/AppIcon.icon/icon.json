@@ -3,7 +3,7 @@
     "refractivity"
   ],
   "fill": {
-    "automatic-gradient": "extended-srgb:0.79000,0.80500,0.73000,1.00000"
+    "automatic-gradient": "extended-srgb:0.55000,0.57500,0.44000,1.00000"
   },
   "groups": [
     {
@@ -31,7 +31,7 @@
         {
           "image-name": "Lens.svg",
           "name": "Circular glass",
-          "opacity": 0.8
+          "opacity": 0.9
         }
       ],
       "specular": false,

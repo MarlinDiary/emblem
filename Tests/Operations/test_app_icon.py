@@ -49,7 +49,7 @@ os.execv("/usr/bin/xcrun", ["xcrun"]+sys.argv[1:])
         icon = ROOT / "Resources/AppIcon.icon"
         definition = json.loads((icon / "icon.json").read_text())
         self.assertIn("refractivity", definition["features"])
-        self.assertEqual(definition["fill"]["automatic-gradient"], "extended-srgb:0.79000,0.80500,0.73000,1.00000")
+        self.assertEqual(definition["fill"]["automatic-gradient"], "extended-srgb:0.55000,0.57500,0.44000,1.00000")
         groups = definition["groups"]
         self.assertEqual([g["layers"][0]["image-name"] for g in groups], ["Head.svg", "Lens.svg", "Body.svg", "Well.svg"])
         self.assertTrue(all(len(g["layers"]) == 1 for g in groups))
@@ -58,7 +58,7 @@ os.execv("/usr/bin/xcrun", ["xcrun"]+sys.argv[1:])
         self.assertEqual(lens["blend-mode"], "multiply")
         self.assertIs(lens["specular"], False)
         self.assertEqual(lens["refractivity"], {"enabled": True, "strength": 0.86, "depth": 0.26})
-        self.assertEqual(lens["layers"][0]["opacity"], 0.8)
+        self.assertEqual(lens["layers"][0]["opacity"], 0.9)
         for index, asset in [(0, "Head.svg"), (2, "Body.svg")]:
             self.assertIs(groups[index]["layers"][0]["glass"], False)
             svg = ET.parse(icon / "Assets" / asset).getroot()
@@ -75,8 +75,9 @@ os.execv("/usr/bin/xcrun", ["xcrun"]+sys.argv[1:])
         for asset in ["Lens.svg", "Well.svg"]:
             circle = ET.parse(icon / "Assets" / asset).getroot().find("{http://www.w3.org/2000/svg}circle")
             self.assertEqual((circle.attrib["cx"], circle.attrib["cy"], circle.attrib["r"]), ("512", "512", "280"))
-        self.assertIn('stop-color="#B9B8A8"', (icon / "Assets/Lens.svg").read_text())
-        self.assertIn('stop-color="#FFFFFA"', (icon / "Assets/Lens.svg").read_text())
+        self.assertIn('fill="#E4E4D6"', (icon / "Assets/Well.svg").read_text())
+        self.assertIn('stop-color="#8A8A74"', (icon / "Assets/Lens.svg").read_text())
+        self.assertIn('stop-color="#F7F7EF"', (icon / "Assets/Lens.svg").read_text())
 
     def test_packaging_compiles_the_icon_instead_of_baking_a_png(self):
         script = (ROOT / "Scripts/build-app.sh").read_text()

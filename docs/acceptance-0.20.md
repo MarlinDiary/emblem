@@ -253,3 +253,20 @@ Push healthy throughout, idle CPU median 0.0%, RSS 95th percentile 185 MB, no he
 restart, no crash report, longest Gmail check age 1,296 s. Those observations stay
 build58's; build59 has its own natural cohort, and one 30-minute window is not a
 multi-day measurement.
+
+## Build60 icon palette
+
+The approved four-vector icon keeps its geometry, layering, multiply lens and absent
+specular, but its background, lens gradient and recess all sat in one narrow light band:
+at 32 px the portrait dissolved into the dish. The background gradient is now a deeper
+stone, 0.55/0.575/0.44 instead of 0.79/0.805/0.73; the lens runs #8A8A74 to #F7F7EF at
+0.9 opacity instead of #B9B8A8 to #FFFFFA at 0.8, and the recess is #E4E4D6. Nothing was
+added: no ring, no specular, no new vector, no changed path. Ring, stamp-edge, deeper
+refraction and dark-ground alternatives were compiled and rejected; deeper refraction
+alone only made the dish hazier, which is why the palette was the change. The resource
+regression locks the new values as it locked the previous ones, and each candidate was
+compared against the system's own composite, in light and dark appearance, at 512, 128,
+64, 32 and 16 px.
+
+Build60 is not built, installed or measured. Application sources are unchanged from
+build59, whose cohort and write measurements stay build59's.
