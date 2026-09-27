@@ -2,7 +2,7 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const headers = {
-      'Content-Security-Policy': "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
@@ -20,6 +20,8 @@ export default {
     }
     const asset = Object.hasOwn(files,url.pathname) ? files[url.pathname] : undefined;
     if (!asset) return new Response(request.method==='HEAD'?null:'Page not found',{status:404,headers:{...headers,'Content-Type':'text/plain; charset=utf-8'}});
-    return new Response(request.method==='HEAD'?null:asset[1],{headers:{...headers,'Content-Type':asset[0]}});
+    // Hashed build assets never change under the same name.
+    const cache = url.pathname.startsWith('/assets/') ? {'Cache-Control':'public, max-age=31536000, immutable'} : {};
+    return new Response(request.method==='HEAD'?null:asset[1],{headers:{...headers,...cache,'Content-Type':asset[0]}});
   },
 };

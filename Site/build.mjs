@@ -1,4 +1,6 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { build, transform } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -10,15 +12,25 @@ const preview = `${repository}/releases/tag/v0.20.0-rc.5`;
 const contact = 'huizha.com@gmail.com';
 const date = '15 September 2026';
 const nav = `<a class="brand" href="/" aria-label="Emblem home"><img class="mark" src="/icon.svg" alt="" width="31" height="31">Emblem</a><nav aria-label="Main navigation"><a href="${repository}">Source</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:${contact}">Contact</a></nav>`;
-const footer = `<footer><span>Made by Chenye Ni · Emblem contributors</span><span><a href="${repository}">GitHub</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:${contact}">Support</a></span><small>Independent software. Not affiliated with Apple or Google.</small></footer>`;
+const footer = `<footer><span>Made by Chenye Ni · Emblem contributors</span><span><a href="${repository}">GitHub</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:${contact}">Support</a><a href="/licenses.txt">Licenses</a></span><small>Independent software. Not affiliated with Apple or Google.</small></footer>`;
 function page(title, description, path, body) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${title}</title><meta name="description" content="${description}"><link rel="canonical" href="${origin}${path}"><link rel="stylesheet" href="/style.css"><link rel="icon" href="/icon.svg" type="image/svg+xml"></head><body><a class="skip" href="#main">Skip to content</a><header>${nav}</header><main id="main">${body}</main>${footer}</body></html>`;
 }
-const home = page('Emblem — A familiar face for your inbox', 'A local-first macOS app that finds sender photos and brand icons, and syncs them to Apple Contacts for Apple Mail.', '/', `
-<section class="hero"><p class="eyebrow">A native macOS companion</p><h1>A familiar face.<br><span>For your inbox.</span></h1><p class="intro">Emblem finds sender photos and brand icons, then brings them to Apple Mail through Apple Contacts.</p><div class="actions"><a class="button" href="${download}">Download for macOS <span aria-hidden="true">↓</span></a><a class="quiet" href="${repository}">View source <span aria-hidden="true">↗</span></a></div><p class="availability">Stable 0.19.0 · Apple silicon · Apple notarized · macOS 14 or later · MIT-licensed</p><p class="availability"><a href="${preview}">0.20.0 RC5 preview</a> · Universal Intel + Apple silicon · Gmail Push and signed updates · Public Google review and 72-hour acceptance pending</p></section>
-<section class="features" id="how-it-works" aria-label="How it works"><article><span class="number">01</span><h2>Connect your inbox.</h2><p>Connect Gmail directly, or use accounts already configured in Apple Mail. Gmail access is limited to metadata, not message bodies.</p></article><article><span class="number">02</span><h2>Find the right face.</h2><p>Discover public photos, brand logos and high-resolution website icons. Choose your own image, or keep a crisp, locally generated monogram.</p></article><article><span class="number">03</span><h2>Let it stay in sync.</h2><p>Sync selected avatars to Apple Contacts. Optional background activity continues after quitting and starts at login, while your Mac is awake.</p></article></section>
-<section class="privacy-panel"><p class="eyebrow">Local first. Clear choices.</p><h2>Your inbox isn’t<br>our database.</h2><p>Your sender library stays on your Mac. Gmail credentials stay in Keychain. Gmail tokens and mailbox content never go to an Emblem server. Optional instant updates use a minimal notification relay; there is no advertising SDK or app telemetry.</p><p>Photo discovery makes requests to external image sources. Optional Gravatar and Libravatar lookups use email hashes, which are <strong>not anonymous</strong>. You can turn them off.</p><a class="quiet" href="/privacy/">Read the full privacy policy <span aria-hidden="true">↗</span></a></section>
-<section class="details"><h2>Small app. Thoughtful boundaries.</h2><div><p>Emblem is an independent SwiftUI and AppKit project. It does not install an Apple Mail plug-in, modify messages or send email.</p><p>Automatic Contacts updates are optional. Existing personal photos are protected unless you choose a replacement. Matching a logo is a visual convenience, not proof that a message is genuine.</p><p>The source and reproducible verification suite are <a href="${repository}">public on GitHub</a>. The downloadable app is Developer ID signed, notarized by Apple, and distributed with a stapled notarization ticket.</p></div></section>`);
+// The homepage keeps every public statement in HTML. Its only script is one
+// self-hosted, network-free module that paints the WebGL scene behind the copy.
+const bundle = await build({ entryPoints: [join(root, 'src/home.js')], bundle: true, format: 'esm', minify: true, target: ['es2020', 'safari15'], write: false, legalComments: 'eof', logLevel: 'warning' });
+const script = bundle.outputFiles[0].text;
+const style = (await transform(await readFile(join(root, 'src/home.css'), 'utf8'), { loader: 'css', minify: true })).code;
+const digest = text => createHash('sha256').update(text).digest('hex').slice(0, 10);
+const scriptPath = `/assets/home.${digest(script)}.js`, stylePath = `/assets/home.${digest(style)}.css`;
+const home = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><meta name="theme-color" content="#0a0b08"><title>Emblem — A familiar face for your inbox</title><meta name="description" content="A local-first macOS app that finds sender photos and brand icons, and syncs them to Apple Contacts for Apple Mail."><link rel="canonical" href="${origin}/"><link rel="stylesheet" href="${stylePath}"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="modulepreload" href="${scriptPath}"></head><body><a class="skip" href="#main">Skip to content</a><canvas id="scene" aria-hidden="true"></canvas><div id="labels" aria-hidden="true"></div><header>${nav}</header><main id="main">
+<section class="act hero" data-act="0"><h1 class="words"><span>A familiar face</span><span class="outline">for your inbox.</span></h1><div class="deck"><p>Emblem finds sender photos and brand icons, then brings them to Apple Mail through Apple Contacts.</p><div class="actions"><a class="button" href="${download}">Download for macOS <span aria-hidden="true">↓</span></a><a class="quiet" href="${repository}">Source <span aria-hidden="true">↗</span></a></div><p class="fine">macOS 14+ · Stable 0.19.0 · <a href="${preview}">0.20.0 RC5 preview</a></p></div><img class="hero-art" src="/icon.svg" alt="" width="420" height="420"></section>
+<section class="act" data-act="1" id="how-it-works"><h2 class="words"><span>Envelopes in.</span><span class="outline right">Faces out.</span></h2><p class="caption">Gmail metadata only. Never message bodies.</p></section>
+<section class="act" data-act="2" id="act-2"><h2 class="words"><span>Seven places</span><span class="outline">to look.</span></h2><p class="caption">Directory photos · BIMI · brand assets · touch icons · website icons · Gravatar, if you want it · a monogram made on your Mac</p></section>
+<section class="act" data-act="3" id="act-3"><h2 class="words right"><span>Synced to</span><span class="outline">Contacts.</span></h2><p class="caption right">Straight into Apple Mail. It can keep going after you quit.</p></section>
+<section class="act" data-act="4" id="act-4"><h2 class="words"><span>Your inbox isn’t</span><span class="outline">our database.</span></h2><p class="caption">Your sender library stays on your Mac. <a href="/privacy/">Privacy policy ↗</a></p></section>
+<section class="act" data-act="5" id="act-5"><h2 class="words"><span>Four layers.</span><span class="outline">One lens.</span></h2><p class="caption">Native SwiftUI and AppKit. Signed and notarized. <a href="${repository}">Open source ↗</a></p></section>
+<section class="act finale" data-act="6" id="act-6"><h2 class="words center"><span>Meet your</span><span class="outline">inbox.</span></h2><div class="deck center"><div class="actions"><a class="button" href="${download}">Download for macOS <span aria-hidden="true">↓</span></a></div><p class="fine">Free · MIT-licensed · Not affiliated with Apple or Google</p></div></section></main>${footer}<script type="module" src="${scriptPath}"></script></body></html>`;
 
 const privacy = page('Privacy Policy — Emblem', 'How Emblem accesses, uses, stores and shares data, including Gmail metadata and optional avatar lookups.', '/privacy/', `
 <article class="document"><p class="eyebrow">Emblem · Updated ${date}</p><h1>Privacy, plainly.</h1><p class="lead">Emblem is developed by Chenye Ni. This policy covers the macOS app and this website. Questions: <a href="mailto:${contact}">${contact}</a>.</p>
@@ -51,12 +63,16 @@ const files = {
   '/privacy/': ['text/html; charset=utf-8', privacy],
   '/terms/': ['text/html; charset=utf-8', terms],
   '/style.css': ['text/css; charset=utf-8', css],
+  [scriptPath]: ['text/javascript; charset=utf-8', script],
+  [stylePath]: ['text/css; charset=utf-8', style],
+  '/licenses.txt': ['text/plain; charset=utf-8', `Third-party software on emblem.protoyard.com\n\nThe homepage animation bundles three.js ${JSON.parse(await readFile(join(root, 'node_modules/three/package.json'), 'utf8')).version} (https://threejs.org/).\n\n${await readFile(join(root, 'node_modules/three/LICENSE'), 'utf8')}`],
   '/icon.svg': ['image/svg+xml', icon],
   '/license.txt': ['text/plain; charset=utf-8', await readFile(join(root, '../LICENSE'), 'utf8')],
   '/appcast.xml': ['application/xml; charset=utf-8', await readFile(join(root,'appcast.xml'),'utf8')],
   '/robots.txt': ['text/plain; charset=utf-8', `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`],
   '/sitemap.xml': ['application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${['/','/privacy/','/terms/'].map(p=>`<url><loc>${origin}${p}</loc></url>`).join('')}</urlset>`],
 };
+await rm(join(root, 'dist'), {recursive:true, force:true});
 await mkdir(join(root, 'dist'), {recursive:true});
 for (const [path, [,body]] of Object.entries(files)) {
   const file = path.endsWith('/') ? `${path}index.html` : path;
@@ -65,4 +81,4 @@ for (const [path, [,body]] of Object.entries(files)) {
 }
 const handler = await readFile(join(root,'handler.mjs'),'utf8');
 await writeFile(join(root,'worker.mjs'),`// Generated by build.mjs; public site content only.\nconst files = ${JSON.stringify(files)};\n${handler}`);
-console.log(`Built ${Object.keys(files).length} static resources. No app data, credentials or client-side scripts.`);
+console.log(`Built ${Object.keys(files).length} static resources. One self-hosted homepage module (${(script.length / 1024).toFixed(0)} KB); no app data or credentials.`);

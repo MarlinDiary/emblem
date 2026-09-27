@@ -39,3 +39,4 @@ Diagnostics/
 Site/dist/
 Site/worker.mjs
 Site/.wrangler/
+Site/node_modules/

@@ -93,6 +93,7 @@ jobs:
       - name: Website resources and isolated withdrawal
         run: |
           cd Site
+          npm ci --no-audit --no-fund
           node build.mjs
           node test.mjs
           python3 -m unittest test_rollback.py -v
