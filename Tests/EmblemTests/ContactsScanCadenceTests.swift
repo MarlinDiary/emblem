@@ -18,6 +18,16 @@ private final class CountingContacts:ContactsScannerPort,@unchecked Sendable {
 /// Enumerating every contact with its thumbnail data four times an hour costs IPC and
 /// memory even when nothing changed. Contacts change history already answers that.
 final class ContactsScanCadenceTests:XCTestCase {
+    @MainActor func testAnInjectedScannerNeverReachesForTheLiveContactsCursor()async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("contacts-cursor-"+UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:root)}
+        let model=AppModel(demo:false,rootOverride:root,contactScanner:CountingContacts(),backgroundWorkAllowed:false)
+        let started=ContinuousClock.now
+        let token=await model.contactsHistoryToken()
+        XCTAssertNil(token)
+        XCTAssertLessThan(started.duration(to:.now),.seconds(1),"Reading the cursor must never block a pass")
+    }
+
     @MainActor func testUnchangedContactsSkipTheFullEnumeration()async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("contacts-cadence-"+UUID().uuidString)
         defer{try? FileManager.default.removeItem(at:root)}

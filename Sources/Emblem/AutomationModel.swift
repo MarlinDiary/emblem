@@ -215,8 +215,17 @@ extension AppModel {
     func contactsUnchangedSinceLastScan()async->Bool {
         guard let token=automation.contactsHistoryToken,contactsConnected else{return false}
         if let probe=contactsHistoryUnchanged {return await probe(token)}
-        guard usesLiveContactScan else{return false}
+        guard usesLiveContactScan,CNContactStore.authorizationStatus(for:.contacts) == .authorized else{return false}
         return (try? await CancellableContactHistoryRead.unchanged(token:token)) == true
+    }
+    /// Contacts IPC can block for tens of seconds, especially without access: keep the
+    /// cursor read off the main actor and bounded, like every other Contacts read.
+    func contactsHistoryToken()async->Data? {
+        if let provider=contactsHistoryTokenProvider {return provider()}
+        guard usesLiveContactScan else{return nil}
+        let read=Task.detached(priority:.utility) {AppleContacts.readHistoryToken()}
+        defer {read.cancel()}
+        return try? await withDeadline(seconds:2) {await read.value}
     }
     func automaticallyDiscover(now: Date) async throws {
         func due(_ date: Date?, after: TimeInterval) -> Bool { date.map { now.timeIntervalSince($0) >= after } ?? true }
@@ -234,7 +243,7 @@ extension AppModel {
                 automation.lastContacts = now; automation.contactsRetryAfter = nil
             } else {
                 automation.contactsPrompted = true; saveAutomationPreferences()
-                let token=contactsHistoryTokenProvider?() ?? (port as? AppleContacts)?.historyToken()
+                let token=await contactsHistoryToken()
                 try Task.checkCancellation()
                 await performScan(.contacts,automatic:true)
                 try Task.checkCancellation()

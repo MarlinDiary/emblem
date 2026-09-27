@@ -133,6 +133,11 @@ import PortraitContactsBridge
         if let error { throw error }
         return result
     }
+    /// Reading the cursor is Contacts IPC: never on the main actor, never unauthorized.
+    nonisolated static func readHistoryToken()->Data? {
+        guard CNContactStore.authorizationStatus(for:.contacts) == .authorized else{return nil}
+        return CNContactStore().currentHistoryToken
+    }
     nonisolated static func readHistoryUnchanged(since token:Data)throws->Bool {
         try Task.checkCancellation()
         guard CNContactStore.authorizationStatus(for:.contacts) == .authorized else {throw PortraitError.message("Full Contacts access is not enabled.")}
