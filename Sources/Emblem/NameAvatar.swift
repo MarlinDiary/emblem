@@ -90,10 +90,9 @@ extension AppModel {
             }
             await Task.yield()
         }
-        if changed {
-            do {try await saveAsync();kickMailSync()}
-            catch {automaticAttention=error.localizedDescription}
-        }
+        // Provisional monograms are regenerated cheaply; they never need their own
+        // rewrite of every sender and photo in the library.
+        if changed {saveSoon();kickMailSync()}
     }
     /// Storage in Contacts does not turn an applied website image into a new source.
     /// Prefer recorded sync provenance, then exact bytes/pixels; never guess a source.

@@ -118,6 +118,11 @@ struct SenderRow: Identifiable, Codable, Sendable {
     var gmailAPI = GmailAPI()
     var gmailTokenProvider: ((String) async throws -> String)?
     var rowsSnapshotEncoder: (([SenderRow]) async throws -> Data)?
+    /// Every save rewrites the whole library. Lookup bookkeeping and provisional
+    /// monograms batch into one rewrite instead of saving every few senders;
+    /// durable boundaries (sync, quit, end of a background pass) still flush.
+    var deferredSaveInterval:TimeInterval=30
+    var deferredSaveTask:Task<Void,Never>?
     @Published var useGravatar = false { didSet { automaticSourcesChanged() } }
     @Published var useWebsite = false { didSet { automaticSourcesChanged() } }
     @Published var automaticEnabled = true { didSet { if !automaticEnabled { stopAutomaticWork() }; saveAutomationPreferences() } }
@@ -296,6 +301,18 @@ struct SenderRow: Identifiable, Codable, Sendable {
         }
     }
     var nextDiscoveryOrder:Int {(rows.compactMap(\.discoveryOrder).max() ?? 0)+1}
+    /// Record that the library is dirty without rewriting it yet.
+    func saveSoon() {
+        guard deferredSaveTask == nil else{return}
+        let interval=deferredSaveInterval
+        deferredSaveTask=Task { [weak self] in
+            try? await Task.sleep(for:.seconds(interval))
+            guard !Task.isCancelled,let self else{return}
+            deferredSaveTask=nil
+            try? await saveAsync()
+        }
+    }
+    func cancelDeferredSave() {deferredSaveTask?.cancel();deferredSaveTask=nil}
     func save() {
         guard launchError == nil else { errorText = launchError; return }
         guard lastSavedRowsRevision != rowsRevision else{return}

@@ -360,7 +360,7 @@ extension AppModel {
                     kickMailSync()
                 }
                 automaticFinished += updated
-                if updated > 0 && (automaticFinished % 10 < updated) {try await saveAsync()}
+                if updated > 0 {saveSoon()}
                 await Task.yield()
             }
         }

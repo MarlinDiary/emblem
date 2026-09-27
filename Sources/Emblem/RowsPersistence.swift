@@ -79,6 +79,7 @@ extension AppModel {
     /// operation. Newer durable user edits win; later unsaved edits stay dirty.
     /// Finish this flush even when its caller is shutting down/cancelled.
     func saveAsync() async throws {
+        cancelDeferredSave()
         if let launchError {throw PortraitError.message(launchError)}
         guard lastSavedRowsRevision != rowsRevision else{return}
         let top=nextDiscoveryOrder+rows.count
