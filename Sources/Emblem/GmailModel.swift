@@ -297,8 +297,9 @@ extension AppModel {
             try Task.checkCancellation()
             let snapshot=rows,revision=rowsRevision
             let data:Data
+            let photos=photoStore
             if let encoder=rowsSnapshotEncoder {data=try await encoder(snapshot)}
-            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot)}.value}
+            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot,photos:photos)}.value}
             try Task.checkCancellation()
             // The batch is already in this snapshot. Later unsaved avatar edits
             // remain dirty; they must not starve the mail cursor by restarting

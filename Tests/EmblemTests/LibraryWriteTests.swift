@@ -55,6 +55,24 @@ final class LibraryWriteTests:XCTestCase {
     }
 }
 
+extension LibraryWriteTests {
+    /// The journal is read and rewritten in full for every Contacts mutation.
+    @MainActor func testJournalIsWrittenCompactly()throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("journal-"+UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:root)}
+        try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
+        let url=root.appendingPathComponent("changes.json")
+        let journal=FileJournal(url:url)
+        let store=try FixtureContactStore()
+        let engine=ChangeEngine(store:store,journal:journal)
+        let candidate=try NameAvatar.candidate(name:"Fixture Person")
+        _=try engine.apply(email:EmailAddress("person@fixture.org")!,name:"Fixture Person",candidate:candidate,allowCreate:true)
+        let text=try String(contentsOf:url,encoding:.utf8)
+        XCTAssertFalse(text.contains("\n  "),"Pretty printing inflates every rewrite of the journal")
+        XCTAssertEqual(try journal.read().count,1)
+    }
+}
+
 private actor EncodeCounter {
     private(set) var count=0
     func record() {count += 1}

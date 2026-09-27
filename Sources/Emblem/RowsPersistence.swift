@@ -2,8 +2,10 @@ import Foundation
 import PortraitCore
 
 enum RowsPersistence {
-    static func encode(_ rows:[SenderRow])throws->Data {
+    static func encode(_ rows:[SenderRow],photos:PhotoStore? = nil)throws->Data {
         let encoder=JSONEncoder();encoder.outputFormatting=[.withoutEscapingSlashes]
+        // Photo bytes go to the store once; the library keeps their references.
+        if let photos {encoder.userInfo[.photoStore]=photos}
         // Keep the on-disk JSON array unchanged, but never build one enormous
         // Foundation encoder tree containing every base64 photo at once.
         // Reserve a bounded estimate to avoid repeated growing-buffer copies.
@@ -87,8 +89,9 @@ extension AppModel {
         let snapshot=rows,revision=rowsRevision
         do {
             let data:Data
+            let photos=photoStore
             if let encoder=rowsSnapshotEncoder {data=try await encoder(snapshot)}
-            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot)}.value}
+            else {data=try await Task.detached(priority:.utility) {try RowsPersistence.encode(snapshot,photos:photos)}.value}
             if let saved=lastSavedRowsRevision,saved>=revision {return}
             try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
             try data.write(to:stateURL,options:.atomic)

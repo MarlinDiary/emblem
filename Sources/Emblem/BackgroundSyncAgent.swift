@@ -166,6 +166,7 @@ import PortraitCore
         for task in tasks {task.cancel()};for task in tasks {await task.value}
         do {try await model.saveAsync()}
         catch {writeStatus("save-error",root:root,model:model,attention:error.localizedDescription);return 1}
+        model.collectPhotoGarbage()
         do {try modelCache.remember(model)}
         catch {modelCache.discard()}
         writeStatus(yielded ? "yielded":"completed",root:root,model:model)

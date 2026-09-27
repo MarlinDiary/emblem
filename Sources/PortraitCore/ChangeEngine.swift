@@ -58,7 +58,8 @@ public extension JournalPort { func lock() throws {} ; func unlock() {} }
     }
     public func write(_ records: [ChangeRecord]) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        // Every Contacts mutation rewrites this file; indentation is pure overhead.
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(records).write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }

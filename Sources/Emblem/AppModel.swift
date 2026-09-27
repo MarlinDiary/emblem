@@ -170,7 +170,11 @@ struct SenderRow: Identifiable, Codable, Sendable {
     // not rebuild the expensive Public Suffix List grouping snapshot.
     var visibleGroupingBuildCount = 0
     var launchError: String?
-    var stateURL: URL { root.appendingPathComponent("senders.json") }
+    /// Photos live beside the library instead of inside it; the pre-migration file
+    /// stays readable so an older build can still open the library after a rollback.
+    var stateURL: URL { root.appendingPathComponent("senders-v2.json") }
+    var legacyStateURL: URL { root.appendingPathComponent("senders.json") }
+    var photoStore: PhotoStore { PhotoStore(directory: root.appendingPathComponent("photos", isDirectory: true)) }
     var sectionRows: [SenderRow] {
         rows.filter { row in
             switch section {
@@ -228,8 +232,13 @@ struct SenderRow: Identifiable, Codable, Sendable {
         } else { port = apple }
         engine = ChangeEngine(store: port, journal: FileJournal(url: root.appendingPathComponent("changes.json")))
         do {
-            if FileManager.default.fileExists(atPath: stateURL.path) {
-                var loadedRows = try JSONDecoder().decode([SenderRow].self, from: Data(contentsOf: stateURL))
+            let photos = PhotoStore(directory: root.appendingPathComponent("photos", isDirectory: true))
+            let stored = root.appendingPathComponent("senders-v2.json"), inline = root.appendingPathComponent("senders.json")
+            let source = FileManager.default.fileExists(atPath: stored.path) ? stored
+                : FileManager.default.fileExists(atPath: inline.path) ? inline : nil
+            if let source {
+                let decoder = JSONDecoder(); decoder.userInfo[.photoStore] = photos
+                var loadedRows = try decoder.decode([SenderRow].self, from: Data(contentsOf: source))
                 if loadedRows.allSatisfy({$0.discoveryOrder == nil}) {
                     // Legacy storage appended first discoveries. Reverse once, without
                     // inventing timestamps for records whose age was never stored.
@@ -243,6 +252,8 @@ struct SenderRow: Identifiable, Codable, Sendable {
                     let previousSelection = loadedRows[rowIndex].selectedCandidate
                     var candidates: [AvatarCandidate] = []
                     for candidate in loadedRows[rowIndex].candidates {
+                        // A photo file that went missing costs one candidate, never the library.
+                        guard !candidate.png.isEmpty else { migratedCandidatePolicy = true; continue }
                         guard !candidate.lowResolution else { migratedCandidatePolicy = true; continue }
                         // Revision 3 images already use the safe-canvas model.
                         // Revision 4 only changes newly fetched declared app icons;
@@ -254,6 +265,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
                         } else { candidates.append(candidate) }
                     }
                     loadedRows[rowIndex].candidates = candidates
+                    if loadedRows[rowIndex].current?.image?.isEmpty == true { loadedRows[rowIndex].current?.image = nil }
                     if let previousSelection, !candidates.contains(where: { $0.id == previousSelection }) {
                         loadedRows[rowIndex].selectedCandidate = CandidateSelection.automaticChoice(candidates)?.id
                         loadedRows[rowIndex].selectionIsManual = false
@@ -301,6 +313,21 @@ struct SenderRow: Identifiable, Codable, Sendable {
         }
     }
     var nextDiscoveryOrder:Int {(rows.compactMap(\.discoveryOrder).max() ?? 0)+1}
+    /// Photos no sender references any more, and the pre-migration library once its
+    /// rollback window has passed. Runs under the writer lease, never mid-save.
+    func collectPhotoGarbage(olderThan seconds:TimeInterval = 3_600) {
+        var keep=Set<String>()
+        for row in rows {
+            for candidate in row.candidates where !candidate.png.isEmpty {keep.insert(digest(candidate.png))}
+            if let image=row.current?.image,!image.isEmpty {keep.insert(digest(image))}
+        }
+        _ = try? photoStore.collectGarbage(keeping:keep,olderThan:seconds)
+        if FileManager.default.fileExists(atPath:stateURL.path),
+           let modified=try? FileManager.default.attributesOfItem(atPath:legacyStateURL.path)[.modificationDate] as? Date,
+           Date().timeIntervalSince(modified) >= 7*86_400 {
+            try? FileManager.default.removeItem(at:legacyStateURL)
+        }
+    }
     /// Record that the library is dirty without rewriting it yet.
     func saveSoon() {
         guard deferredSaveTask == nil else{return}
@@ -321,7 +348,7 @@ struct SenderRow: Identifiable, Codable, Sendable {
             // New/test-created rows already have their intended visible order.
             let top=nextDiscoveryOrder+rows.count
             for i in rows.indices where rows[i].discoveryOrder == nil {rows[i].discoveryOrder=top-i}
-            try RowsPersistence.encode(rows).write(to: stateURL, options: .atomic)
+            try RowsPersistence.encode(rows, photos: photoStore).write(to: stateURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stateURL.path)
             try clearInboxReceiptOverlay()
             lastSavedRowsRevision=rowsRevision

@@ -97,6 +97,48 @@ public struct AvatarCandidate: Identifiable, Codable, Sendable {
     public init(source: CandidateSource, origin: String, width: Int, height: Int, vector: Bool = false, png: Data, maskable: Bool = false, framing: AvatarFraming? = nil, subjectWidth: Int? = nil, subjectHeight: Int? = nil, layoutRevision: Int? = ImagePipeline.currentLayoutRevision, artwork: BrandArtwork? = nil, id: UUID = UUID()) {
         self.id = id; self.source = source; self.origin = origin; self.width = width; self.height = height; self.vector = vector; self.png = png; self.maskable = maskable; self.framing = framing; self.subjectWidth = subjectWidth; self.subjectHeight = subjectHeight; self.layoutRevision = layoutRevision; self.artwork = artwork
     }
+    private enum CodingKeys: String, CodingKey {
+        case id, source, origin, width, height, vector, png, pngRef, maskable, framing
+        case subjectWidth, subjectHeight, layoutRevision, artwork, declared, visualQuality
+    }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        source = try container.decode(CandidateSource.self, forKey: .source)
+        origin = try container.decode(String.self, forKey: .origin)
+        width = try container.decode(Int.self, forKey: .width)
+        height = try container.decode(Int.self, forKey: .height)
+        vector = try container.decode(Bool.self, forKey: .vector)
+        png = decoder.photo(inline: try container.decodeIfPresent(Data.self, forKey: .png),
+                            reference: try container.decodeIfPresent(String.self, forKey: .pngRef)) ?? Data()
+        maskable = try container.decodeIfPresent(Bool.self, forKey: .maskable)
+        framing = try container.decodeIfPresent(AvatarFraming.self, forKey: .framing)
+        subjectWidth = try container.decodeIfPresent(Int.self, forKey: .subjectWidth)
+        subjectHeight = try container.decodeIfPresent(Int.self, forKey: .subjectHeight)
+        layoutRevision = try container.decodeIfPresent(Int.self, forKey: .layoutRevision)
+        artwork = try container.decodeIfPresent(BrandArtwork.self, forKey: .artwork)
+        declared = try container.decodeIfPresent(Bool.self, forKey: .declared)
+        visualQuality = try container.decodeIfPresent(AvatarVisualQuality.self, forKey: .visualQuality)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(source, forKey: .source)
+        try container.encode(origin, forKey: .origin)
+        try container.encode(width, forKey: .width)
+        try container.encode(height, forKey: .height)
+        try container.encode(vector, forKey: .vector)
+        if let reference = try encoder.photoReference(png) { try container.encode(reference, forKey: .pngRef) }
+        else { try container.encode(png, forKey: .png) }
+        try container.encodeIfPresent(maskable, forKey: .maskable)
+        try container.encodeIfPresent(framing, forKey: .framing)
+        try container.encodeIfPresent(subjectWidth, forKey: .subjectWidth)
+        try container.encodeIfPresent(subjectHeight, forKey: .subjectHeight)
+        try container.encodeIfPresent(layoutRevision, forKey: .layoutRevision)
+        try container.encodeIfPresent(artwork, forKey: .artwork)
+        try container.encodeIfPresent(declared, forKey: .declared)
+        try container.encodeIfPresent(visualQuality, forKey: .visualQuality)
+    }
     public var effectiveFraming: AvatarFraming { framing ?? (source.isBrand ? (maskable == true ? .brandMaskable : .brandSafe) : .personFill) }
     public var circularSuitable: Bool {
         let w = subjectWidth ?? width, h = subjectHeight ?? height
@@ -167,6 +209,23 @@ public struct ContactSnapshot: Codable, Equatable, Sendable {
     public var emails: [String]
     public var image: Data?
     public init(id: String, name: String, emails: [String], image: Data?) { self.id = id; self.name = name; self.emails = emails; self.image = image }
+    private enum CodingKeys: String, CodingKey { case id, name, emails, image, imageRef }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        emails = try container.decode([String].self, forKey: .emails)
+        image = decoder.photo(inline: try container.decodeIfPresent(Data.self, forKey: .image),
+                              reference: try container.decodeIfPresent(String.self, forKey: .imageRef))
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(emails, forKey: .emails)
+        if let image, let reference = try encoder.photoReference(image) { try container.encode(reference, forKey: .imageRef) }
+        else { try container.encodeIfPresent(image, forKey: .image) }
+    }
 }
 
 public enum ChangeState: String, Codable { case prepared, applied, undone, failed }
