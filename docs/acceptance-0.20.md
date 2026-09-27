@@ -240,5 +240,16 @@ save, which the end of a background pass, a sync error and quit still force. The
 regression reproduces the measured shape — six bookkeeping-only passes after one applied
 photo — and rewrote the library seven times before the change.
 
-Build59 needs its own signing, installation, natural cohort and write measurement.
-Build58's observations are retained and not relabelled as build59's.
+Build59 was signed with the same identity, again not notarized, and installed over
+build58 at 19:31 NZST on 27 September after the same library archive; its bundle differs
+from build58's only in bundle version and source revision, with an identical designated
+requirement and entitlements. Its own thirty minutes with the app closed, the window that
+measured 53 rewrites: one pass of 69 seconds, 3 library writes, 10.9 MB, no Contacts write
+and no photo file rewritten, about 0.5 GB a day, or near 1 GB if every 15-minute wake ran
+a full pass. A comparable build58 pass of 70 seconds wrote 23 times.
+
+Build58's cohort was ended after 62 minutes and 63 samples when build59 replaced it:
+Push healthy throughout, idle CPU median 0.0%, RSS 95th percentile 185 MB, no helper
+restart, no crash report, longest Gmail check age 1,296 s. Those observations stay
+build58's; build59 has its own natural cohort, and one 30-minute window is not a
+multi-day measurement.
