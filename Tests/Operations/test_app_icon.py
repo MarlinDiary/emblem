@@ -68,13 +68,15 @@ os.execv("/usr/bin/xcrun", ["xcrun"]+sys.argv[1:])
             self.assertEqual(list(svg)[0].attrib["fill"], "#fff")
             self.assertFalse(any(e.tag.endswith(("circle", "rect", "image", "clipPath")) for e in svg.iter()))
         body = list(ET.parse(icon / "Assets/Body.svg").getroot())[0].attrib["d"]
-        self.assertIn("A280 280 0 0 1 292 685.2050807569Z", body)
+        self.assertIn("A358.4 358.4 0 0 1 230.4 733.7025033688Z", body)
         # The shoulder endpoints and the lower silhouette share the glass circle.
         import math
-        self.assertAlmostEqual(math.hypot(292-512, 685.2050807569-512), 280, places=8)
+        self.assertAlmostEqual(math.hypot(230.4-512, 733.7025033688-512), 358.4, places=8)
+        # The lens spans 70% of the tile; Apple's own Contacts circle spans about 63%.
+        self.assertAlmostEqual(2 * 358.4 / 1024, 0.70, places=3)
         for asset in ["Lens.svg", "Well.svg"]:
             circle = ET.parse(icon / "Assets" / asset).getroot().find("{http://www.w3.org/2000/svg}circle")
-            self.assertEqual((circle.attrib["cx"], circle.attrib["cy"], circle.attrib["r"]), ("512", "512", "280"))
+            self.assertEqual((circle.attrib["cx"], circle.attrib["cy"], circle.attrib["r"]), ("512", "512", "358.4"))
         self.assertIn('fill="#E4E4D6"', (icon / "Assets/Well.svg").read_text())
         self.assertIn('stop-color="#8A8A74"', (icon / "Assets/Lens.svg").read_text())
         self.assertIn('stop-color="#F7F7EF"', (icon / "Assets/Lens.svg").read_text())

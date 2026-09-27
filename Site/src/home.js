@@ -351,7 +351,8 @@ function buildIcon(renderer) {
   const group = new Group();
   const pivot = new Group(); group.add(pivot);
   const slabShape = squircle(512, 4.8, 180);
-  const hole = new Path(); hole.absarc(0, 0, 280, 0, TAU, true); slabShape.holes.push(hole);
+  const glyphScale = 1.28; // Resources/AppIcon.icon: lens radius 358.4 = 280 x 1.28
+  const hole = new Path(); hole.absarc(0, 0, 280 * glyphScale, 0, TAU, true); slabShape.holes.push(hole);
   const slabGeometry = new ExtrudeGeometry(slabShape, { depth: 70, bevelEnabled: true, bevelThickness: 22, bevelSize: 18, bevelSegments: 8, curveSegments: 128 });
   slabGeometry.translate(0, 0, -92);
   const sage = new MeshPhysicalMaterial({ color: '#8c9370', roughness: 0.46, clearcoat: 0.75, clearcoatRoughness: 0.22, sheen: 0.5, sheenColor: '#d3d8b4', sheenRoughness: 0.6 });
@@ -384,7 +385,9 @@ function buildIcon(renderer) {
   const layers = [head, lens, body, well, slab];
   const baseZ = layers.map(m => m.position.z);
   const explodeZ = [430, 230, 20, -210, -420];
-  pivot.add(slab, well, body, lens, head, badge);
+  const glyph = new Group(); glyph.scale.set(glyphScale, glyphScale, 1);
+  glyph.add(well, body, lens, head, badge);
+  pivot.add(slab, glyph);
   pivot.scale.setScalar(unit);
   // Intro: every layer flies in from its own direction.
   const rnd = random(11);

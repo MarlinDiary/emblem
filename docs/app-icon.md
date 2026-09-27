@@ -7,7 +7,7 @@ Front to back: **Head.svg → Lens.svg → Body.svg → Well.svg**.
 
 The head is above the circular glass; the body is below it. Head and body each
 contain just one white path, with no portrait background disk. The body's lower
-arc and the lens share center(512,512), radius280, so the bottom silhouette meets
+arc and the lens share center(512,512), radius358.4, so the bottom silhouette meets
 the lens edge. The separate recess is behind the body, not part of its artwork.
 The stone gradient lens (#8A8A74 to #F7F7EF) uses Multiply, opacity0.9, refractivity
 strength0.86 and depth0.26; the recess is #E4E4D6 and the background gradient derives
@@ -18,6 +18,12 @@ Build60 changed only these colors. Build55's background (0.79/0.805/0.73), lens
 (#B9B8A8 to #FFFFFA at 0.8) and recess (#F1F1E8) sat in one light band, and the
 portrait dissolved into the dish at 32 px. Vectors, ordering, refractivity and the
 disabled specular are unchanged.
+
+Build61 enlarged the whole glyph by 1.28 about the centre, so the lens spans 70% of
+the tile instead of 55%. Beside Apple's own icons the glyph read as too small: the
+Contacts circle spans about 63% of its tile, and envelope, camera and note glyphs
+about 72-75%. Every vector scaled together, so the head stays above the lens, the
+shoulders still end exactly on the lens circle and colours are untouched.
 This is independently drawn artwork, not extracted Contacts app imagery.
 
 `Scripts/build-app.sh` calls `Scripts/build-icon.sh` before signing. Apple's

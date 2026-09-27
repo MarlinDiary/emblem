@@ -281,3 +281,13 @@ it: Push healthy in 0.993 of eligible samples, one sample stale by heartbeat whi
 worker ran, idle CPU median 0.0% and 95th percentile 7.2%, RSS 95th percentile 215 MB,
 no helper restart, no crash report, no stale Gmail check, longest check age 1,150 s.
 Build60 starts its own 72-hour cohort.
+
+## Build61 larger glyph
+
+Beside Apple's own icons, rendered by the same icon service, Emblem's glyph read as too
+small: its lens spanned 55% of the tile, Apple's Contacts circle about 63%, and Mail,
+FaceTime and Music glyphs about 72-75%. All four vectors now scale by 1.28 about the
+centre, so the lens spans 70%. Colours, layer order, refraction and the disabled
+specular are unchanged, and the shoulders still end exactly on the lens circle. The
+website's flat and 3D icons follow the same geometry. Application sources are unchanged
+from build60.
