@@ -27,6 +27,7 @@ struct AutomationPreferences: Codable {
     var lastSentSweep: Date?
     var sentRetryAfter: Date?
     var emptyInboxScans: Int?
+    var contactsHistoryToken: Data?
 
     mutating func separateMailRetryChannels() {
         guard mailRetryChannels == nil else {return}
@@ -209,6 +210,14 @@ extension AppModel {
         }
         refreshAutomaticWorking()
     }
+    /// Contacts change history excludes this app's own writes, so "unchanged" means
+    /// no card that discovery cares about moved since the last full enumeration.
+    func contactsUnchangedSinceLastScan()async->Bool {
+        guard let token=automation.contactsHistoryToken,contactsConnected else{return false}
+        if let probe=contactsHistoryUnchanged {return await probe(token)}
+        guard usesLiveContactScan else{return false}
+        return (try? await CancellableContactHistoryRead.unchanged(token:token)) == true
+    }
     func automaticallyDiscover(now: Date) async throws {
         func due(_ date: Date?, after: TimeInterval) -> Bool { date.map { now.timeIntervalSince($0) >= after } ?? true }
         let permission: CNAuthorizationStatus = automation.contacts && usesLiveContactScan ? CNContactStore.authorizationStatus(for:.contacts) : .authorized
@@ -219,12 +228,19 @@ extension AppModel {
                 contactsConnected = false
                 automaticAttention = "Allow Contacts access in System Settings → Privacy & Security. Photo previews remain available."
                 automation.contactsRetryAfter = now.addingTimeInterval(900)
+            } else if await contactsUnchangedSinceLastScan() {
+                // Enumerating every card with its thumbnail four times an hour is
+                // wasted when Contacts change history reports nothing new.
+                automation.lastContacts = now; automation.contactsRetryAfter = nil
             } else {
                 automation.contactsPrompted = true; saveAutomationPreferences()
+                let token=contactsHistoryTokenProvider?() ?? (port as? AppleContacts)?.historyToken()
                 try Task.checkCancellation()
                 await performScan(.contacts,automatic:true)
                 try Task.checkCancellation()
-                if scanReport?.phase == .completed { automation.lastContacts = now; automation.contactsRetryAfter = nil }
+                if scanReport?.phase == .completed {
+                    automation.lastContacts = now; automation.contactsRetryAfter = nil; automation.contactsHistoryToken = token
+                }
                 else { automation.contactsRetryAfter = now.addingTimeInterval(900) }
             }
             saveAutomationPreferences()

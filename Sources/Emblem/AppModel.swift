@@ -118,6 +118,8 @@ struct SenderRow: Identifiable, Codable, Sendable {
     var gmailAPI = GmailAPI()
     var gmailTokenProvider: ((String) async throws -> String)?
     var rowsSnapshotEncoder: (([SenderRow]) async throws -> Data)?
+    var contactsHistoryTokenProvider: (()->Data?)?
+    var contactsHistoryUnchanged: ((Data) async -> Bool)?
     /// Every save rewrites the whole library. Lookup bookkeeping and provisional
     /// monograms batch into one rewrite instead of saving every few senders;
     /// durable boundaries (sync, quit, end of a background pass) still flush.
