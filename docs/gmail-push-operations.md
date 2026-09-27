@@ -6,7 +6,7 @@ This feature is on the development branch. The tagged 0.19.0 release still uses 
 
 Gmail `users.watch` (INBOX and SENT) → Pub/Sub authenticated HTTPS Push → Cloudflare Worker → per-account SQLite Durable Object with hibernatable WebSockets → Emblem's macOS-managed background helper → the process holding the library lease → `history.list` → inbox senders and To/Cc sent recipients → existing avatar lookup and journaled Contacts sync.
 
-The foreground app exits on Command-Q. The helper is a separate `SMAppService` login item: it starts at login, stays connected while at least one mailbox has a valid Push registration, and yields library writes to the visible app. Without a Push-ready account it keeps the existing bounded, approximately one-minute job. macOS approval in Login Items remains required when the OS requests it.
+The foreground app exits on Command-Q. The helper is a separate `SMAppService` login item: it starts at login, stays connected while at least one mailbox has a valid Push registration, and yields library writes to the visible app. Without a Push-ready account it keeps the existing bounded, approximately one-minute job; the Apple Mail scan inside it backs off as described below. macOS approval in Login Items remains required when the OS requests it.
 
 The listener also probes writer ownership without retaining the lease. When the foreground process exits it starts a catch-up pass within the ten-second ownership check, so unfinished photo work does not wait for the next 15-minute Gmail safety check.
 
@@ -18,7 +18,7 @@ Notifications are **hints**, not authoritative cursors. Emblem replays its persi
 - The WebSocket uses 45-second protocol pings, a 15-second ping deadline, and reconnect backoff from 1 to 60 seconds.
 - Socket liveness is recorded separately from the library lease on every valid frame and successful protocol ping. A known disconnect clears only its own connection record; a replaced connection cannot erase a newer heartbeat. Silent/stale heartbeats expire after 120 seconds. A registered watch without a live socket immediately uses the regular check policy, while its listener continues reconnecting.
 - A healthy Push account gets a 15-minute safety check for delayed/dropped Gmail notifications. A failed or non-Push account retains regular checks, with 5-minute API error backoff.
-- Apple Mail fallback retains approximately one-minute checks when enabled; it covers other accounts and unhealthy Gmail connections, not another address merely sharing `gmail.com`.
+- Apple Mail fallback checks about every minute when enabled and steps back to 5, then 15 minutes while consecutive scans find nothing; new mail or an account-routing change returns it to one minute. With healthy Push the helper's own wake interval follows the same steps. It covers other accounts and unhealthy Gmail connections, not another address merely sharing `gmail.com`.
 - Gmail watch renews **automatically daily**, and also when less than 48 hours remain. No weekly manual action is required. Failed renewals retry after 5 minutes and leave regular checks available.
 - Device registration lasts 180 days and renews automatically with less than seven days left. Disconnect removes the local credentials and attempts to unregister this Mac, without stopping another Mac's mailbox watch.
 - Sleep, logout and offline periods pause delivery. Push does not wake a powered-off Mac. On wake/reconnect, the Mac catches up from history; if Google expires that cursor it safely rebuilds the inbox without deleting senders.

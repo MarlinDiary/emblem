@@ -45,7 +45,7 @@ const css = `:root{color-scheme:light dark;--bg:#fafafa;--ink:#1d1d1f;--muted:#6
 // flat web brand rendition; native refraction remains system-rendered.
 const artwork = '../Resources/AppIcon.icon/Assets/';
 const contents = async name => (await readFile(join(root, artwork, name), 'utf8')).replace(/<svg[^>]*>/, '').replace('</svg>', '');
-const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" rx="256" fill="#C9CDBA"/><g opacity="0.65">${await contents('Well.svg')}</g>${await contents('Body.svg')}<g opacity="0.8" style="mix-blend-mode:multiply">${await contents('Lens.svg')}</g>${await contents('Head.svg')}</svg>`;
+const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" rx="256" fill="#8C9370"/><g opacity="0.65">${await contents('Well.svg')}</g>${await contents('Body.svg')}<g opacity="0.9" style="mix-blend-mode:multiply">${await contents('Lens.svg')}</g>${await contents('Head.svg')}</svg>`;
 const files = {
   '/': ['text/html; charset=utf-8', home],
   '/privacy/': ['text/html; charset=utf-8', privacy],

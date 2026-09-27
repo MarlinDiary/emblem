@@ -57,7 +57,7 @@ Automatic Contacts sync is opt-in. Once enabled, new eligible senders and select
 
 ### Background operation
 
-**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. Gmail Push notifications wake the resident helper immediately. A 15-minute safety check recovers missed hints when every account has healthy Push; non-Push/failed Gmail or Apple Mail fallback retains its one-minute scheduling while awake. Watches renew automatically each day. The older tagged 0.19.0 release uses polling; current `main` includes Push. See [Push operations and acceptance](docs/gmail-push-operations.md).
+**Continue after quitting** registers a macOS-managed login item with `SMAppService`. The foreground process exits on Command-Q; a bounded headless job checks incremental Gmail history first and uses Apple Mail as needed. Gmail Push notifications wake the resident helper immediately. A 15-minute safety check recovers missed hints when every account has healthy Push, and a Gmail account without healthy Push is still checked about every minute while awake. The Apple Mail fallback starts at one minute and steps back to 5, then 15 minutes while consecutive scans find nothing; new mail or an account-routing change returns it to one minute. Watches renew automatically each day. The older tagged 0.19.0 release uses polling; current `main` includes Push. See [Push operations and acceptance](docs/gmail-push-operations.md).
 
 The foreground app and background job share an exclusive library lease, so they do not write the local library or Contacts concurrently.
 
@@ -67,7 +67,9 @@ Version 0.18 replaces the sender sidebar's per-row SwiftUI tree with a virtualiz
 
 Background passes transform the decoded library before publishing it once, retain that loaded revision, persist receipt-only Gmail changes in a small overlay, and bound Contacts history IPC before conservatively falling back to a linked-card read. Legacy photo-fingerprint enrichment is versioned and runs once. New mail and idle shutdown therefore do not copy, rescan, or re-encode every cached image.
 
-Regression coverage includes a 1,800-row native table, a 903-row selection benchmark, empty Gmail history pages that leave the large sender library untouched, and a Contacts change-history fast path.
+Cached artwork lives in `photos/` beside the sender library, stored once per content hash instead of inline as base64, so senders of one organization share a file and a routine save rewrites only metadata. Bookkeeping saves are batched for up to 30 seconds, while a completed Contacts write, a sync error, the end of a background pass and quit still save immediately. On one Mac with about 1,060 senders, the library went from a 91.7 MB file to 3.6 MB plus 31 MB of photos, and measured library writes with the app closed fell from about 407 GB a day to between 0.5 and 1 GB. The full Contacts enumeration is skipped while change history reports nothing new, and the change journal is written without pretty-printing.
+
+Regression coverage includes a 1,800-row native table, a 903-row selection benchmark, empty Gmail history pages that leave the large sender library untouched, a Contacts change-history fast path, sync passes that apply nothing without rewriting the library, and a library that still opens when a photo file is lost.
 
 ## App updates
 
@@ -128,7 +130,7 @@ A broadly distributed OAuth client must satisfy Google's consent-screen and rest
 
 ## Privacy and security
 
-- Sender addresses, cached images, settings, and mutation journals stay under `~/Library/Application Support/Emblem/` with restricted permissions.
+- Sender addresses, cached images (one file per distinct image in `photos/`), settings, and mutation journals stay under `~/Library/Application Support/Emblem/` with restricted permissions.
 - Gmail credentials and imported OAuth client configuration stay in the login Keychain.
 - Website discovery accepts only public HTTPS endpoints on port 443, rejects credential-bearing/private-network URLs, and bounds redirects, download sizes, SVG features, image dimensions, and concurrency.
 - Enabling Libravatar and Gravatar sends each service a hash derived from the sender address. This hash is not anonymous because anyone who already knows the address can compute it.

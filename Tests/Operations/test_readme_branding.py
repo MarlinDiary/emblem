@@ -8,7 +8,7 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = {
-    'emblem-icon.png': ('44ea9aae6386521a3ed761433070206e1eeed2cd8ddece9358352ea491fc45cf', (1024, 1024)),
+    'emblem-icon.png': ('f1b0161772746c2fb5ee7bb01bfd2a336a65e7eeee5d791c68df23dcaf04bc1e', (1024, 1024)),
     'apple-mail-avatars.png': ('41a8b1846d0aaa6c97454da71689ec2ff9cffc97cc07009177cc1d4e6af367e1', (3296, 2200)),
 }
 

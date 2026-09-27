@@ -34,7 +34,7 @@ for(const asset of ['Head.svg','Body.svg']) {
   assert.ok(siteIcon.includes(glyph.match(/ d="([^"]+)"/)[1]));
 }
 assert.equal((siteIcon.match(/<path /g)||[]).length,2);
-assert.match(siteIcon,/fill="#C9CDBA"/);
+assert.match(siteIcon,/fill="#8C9370"/);
 assert.match(siteIcon,/mix-blend-mode:multiply/);
 assert.doesNotMatch(siteIcon,/#2b70f4|Emblem.svg/);
 const home=await (await worker.fetch(new Request(origin+'/'))).text();

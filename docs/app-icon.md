@@ -1,7 +1,7 @@
 # Native layered app icon
 
-`Resources/AppIcon.icon` is the approved editable Icon Composer document for
-build55, with a warm ivory/gray/sage background and four original vector assets.
+`Resources/AppIcon.icon` is the approved editable Icon Composer document, with a
+deep stone/sage background and four original vector assets.
 There are no colored page tabs, rasterized highlights or baked glass effects.
 Front to back: **Head.svg → Lens.svg → Body.svg → Well.svg**.
 
@@ -9,8 +9,15 @@ The head is above the circular glass; the body is below it. Head and body each
 contain just one white path, with no portrait background disk. The body's lower
 arc and the lens share center(512,512), radius280, so the bottom silhouette meets
 the lens edge. The separate recess is behind the body, not part of its artwork.
-The gray gradient lens uses Multiply, opacity0.8, refractivity strength0.86 and
-depth0.26. Specular is disabled on this group: no bright white upper circular rim.
+The stone gradient lens (#8A8A74 to #F7F7EF) uses Multiply, opacity0.9, refractivity
+strength0.86 and depth0.26; the recess is #E4E4D6 and the background gradient derives
+from extended sRGB 0.55/0.575/0.44. Specular is disabled on this group: no bright
+white upper circular rim.
+
+Build60 changed only these colors. Build55's background (0.79/0.805/0.73), lens
+(#B9B8A8 to #FFFFFA at 0.8) and recess (#F1F1E8) sat in one light band, and the
+portrait dissolved into the dish at 32 px. Vectors, ordering, refractivity and the
+disabled specular are unchanged.
 This is independently drawn artwork, not extracted Contacts app imagery.
 
 `Scripts/build-app.sh` calls `Scripts/build-icon.sh` before signing. Apple's
@@ -27,7 +34,7 @@ unchanged. No flattening or editable-source modification is involved. Older OS
 appearance behavior still has a separate runtime check.
 
 Native Icon Composer exports reviewed include Default, Dark and Mono at1024px,
-Default at64px, and design generations26 and27. The generation27 upper lens arc
+Default at64px, and design generations26 and27. For build55, the generation27 upper lens arc
 regression used12420 identical pixels: the rejected white-lid draft had3031
 near-white pixels; the approved gray lens has0. This bounded test is about the
 upper circular rim, not all highlights on the outer app enclosure.
