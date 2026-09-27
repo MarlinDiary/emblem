@@ -19,9 +19,11 @@ import PortraitCore
     private static let modelCache=BackgroundModelCache()
     private static let watchdog=HelperWatchdog()
 
-    nonisolated static func fallbackInterval(mailEnabled:Bool,accounts:[GmailAccount],now:Date)->TimeInterval {
-        // Push must not slow down another mailbox that still uses regular sync.
-        mailEnabled || accounts.contains(where:{!$0.pushIsHealthy(at:now)}) ? 60:900
+    nonisolated static func fallbackInterval(mailEnabled:Bool,emptyInboxScans:Int,accounts:[GmailAccount],now:Date)->TimeInterval {
+        // Push must not slow down another mailbox that still uses regular sync,
+        // and a mailbox that keeps examining nothing must not wake this helper.
+        if accounts.contains(where:{!$0.pushIsHealthy(at:now)}) {return 60}
+        return mailEnabled ? MailFallbackCadence.interval(consecutiveEmpty:emptyInboxScans,syncEnabled:true):900
     }
     nonisolated static func mailFallbackAttention(permission:OSStatus)->String? {
         // procNotFound only means Mail is closed; its fallback resumes when Mail runs.
@@ -35,7 +37,7 @@ import PortraitCore
             let heartbeat=try? presence.lastAlive(accountID:accounts[index].id)
             accounts[index].push?.deliveryHeartbeat=heartbeat
         }
-        return fallbackInterval(mailEnabled:automation?.mail != false,accounts:accounts,now:Date())
+        return fallbackInterval(mailEnabled:automation?.mail != false,emptyInboxScans:automation?.emptyInboxScans ?? 0,accounts:accounts,now:Date())
     }
 
     static func run(arguments:[String])async->Int32 {

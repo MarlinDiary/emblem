@@ -153,9 +153,9 @@ final class GmailPushTests: XCTestCase {
         state.registrationExpiration = now.addingTimeInterval(86_400)
         XCTAssertTrue(state.registrationNeedsRenewal(now: now))
         let account = GmailAccount(id: "account", email: "fixture@gmail.com", push: healthyPush(now: now))
-        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, accounts: [account], now: now), 900)
-        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: true, accounts: [account], now: now), 60)
-        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, accounts: [GmailAccount(id: "regular", email: "fixture@gmail.com")], now: now), 60)
+        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, emptyInboxScans: 0, accounts: [account], now: now), 900)
+        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: true, emptyInboxScans: 0, accounts: [account], now: now), 60)
+        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, emptyInboxScans: 0, accounts: [GmailAccount(id: "regular", email: "fixture@gmail.com")], now: now), 60)
     }
 
     /// URLSession reported one ping twice when its connection failed seconds after wake;
@@ -260,7 +260,7 @@ final class GmailPushTests: XCTestCase {
                                    watchExpiration: now.addingTimeInterval(7 * 86_400), lastWatchRenewal: now)
         let account = GmailAccount(id: "account", email: "fixture@gmail.com", push: state)
         XCTAssertFalse(account.pushIsHealthy(at: now), "A saved watch does not prove a live delivery channel")
-        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, accounts: [account], now: now), 60)
+        XCTAssertEqual(BackgroundSyncAgent.fallbackInterval(mailEnabled: false, emptyInboxScans: 0, accounts: [account], now: now), 60)
     }
 
     func testPresenceHeartbeatExpiresAndOldDisconnectCannotEraseNewSocket() throws {

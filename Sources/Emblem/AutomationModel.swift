@@ -26,6 +26,7 @@ struct AutomationPreferences: Codable {
     var lastSent: Date?
     var lastSentSweep: Date?
     var sentRetryAfter: Date?
+    var emptyInboxScans: Int?
 
     mutating func separateMailRetryChannels() {
         guard mailRetryChannels == nil else {return}
@@ -39,6 +40,20 @@ struct AutomationPreferences: Codable {
 enum AutomaticConnectionPolicy {
     static func mayRequestContacts(_ status: CNAuthorizationStatus) -> Bool {
         status == .notDetermined || status == .authorized
+    }
+}
+
+/// Apple Mail is the fallback for accounts the Gmail API does not cover. When its
+/// routed scans keep examining nothing, waking Mail every minute only spends CPU and
+/// battery; any real message, routing change or retry resets the cadence.
+enum MailFallbackCadence {
+    static func interval(consecutiveEmpty:Int,syncEnabled:Bool)->TimeInterval {
+        guard syncEnabled else {return 900}
+        switch consecutiveEmpty {
+        case ..<3: return 60
+        case ..<6: return 300
+        default: return 900
+        }
     }
 }
 
@@ -228,13 +243,13 @@ extension AppModel {
                 automation.mailPrimaryGmailEmails=primary.sorted()
                 automation.mailRoutingCatchup=true
                 automation.mailRetryAfter=nil;automation.fullMailRetryAfter=nil
-                automation.lastInboxSweep=nil;automation.lastFullMail=nil
+                automation.lastInboxSweep=nil;automation.lastFullMail=nil;automation.emptyInboxScans=nil
                 automation.lastSent=nil;automation.lastSentSweep=nil;automation.sentPosition=nil;automation.sentBootstrapStarted=nil;automation.sentRetryAfter=nil
             }
             let missingDates=usesLiveMailScan && !rows.isEmpty && rows.allSatisfy{$0.lastInboxReceivedAt == nil}
             let inboxAvailable=(automation.mailRetryAfter ?? .distantPast)<=now
             let historyAvailable=(automation.fullMailRetryAfter ?? .distantPast)<=now
-            let inboxDue=due(automation.lastInbox,after:mailSync.enabled ? 60:900)
+            let inboxDue=due(automation.lastInbox,after:MailFallbackCadence.interval(consecutiveEmpty:automation.emptyInboxScans ?? 0,syncEnabled:mailSync.enabled))
             let source:ScanSource?
             if inboxAvailable && automation.mailRoutingCatchup == true {source = .inbox}
             else if inboxAvailable && (missingDates || (mailSync.enabled && automation.lastInbox != nil && inboxDue)) {source = .inbox}
@@ -243,14 +258,15 @@ extension AppModel {
             else {source=nil}
             if let source {
                 do {
-                    var incremental=false
+                    var incremental=false,examinedMail=false
                     if source == .inbox,let since=automation.lastInbox,!due(automation.lastInboxSweep,after:86400),
                        let page=try await mailScanner.recentInbox(since:since.addingTimeInterval(-300),excludingAccountEmails:primary) {
-                        incremental=try await ingestRecentInbox(page)
+                        incremental=try await ingestRecentInbox(page);examinedMail = !page.senders.isEmpty
                     }
-                    if !incremental {await performScan(source,automatic:true,excludingAccountEmails:primary)}
+                    if !incremental {await performScan(source,automatic:true,excludingAccountEmails:primary);examinedMail=(scanReport?.examined ?? 0)>0}
                     try Task.checkCancellation()
                     if scanReport?.phase == .completed {
+                        if source == .inbox {automation.emptyInboxScans=examinedMail ? 0:(automation.emptyInboxScans ?? 0)+1}
                         if source == .inbox {automation.mailRoutingCatchup=false}
                         if source == .allMail { automation.lastFullMail = now }
                         automation.lastInbox=now
